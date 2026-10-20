@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>GGAS Student Support - Telegram Mini App</title>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#033b43',
+              primary: '#004d5a',
+              medium: '#0a6473',
+              light: '#0e869b',
+              accent: '#26a69a',
+              mint: '#e6f4f6',
+              surface: '#edf7f9',
+              card: '#ffffff'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Custom scrollbar and styling matching Telegram WebApp */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 77, 90, 0.2);
+      border-radius: 4px;
+    }
+    .custom-gradient-card {
+      background: linear-gradient(135deg, #024b57 0%, #066575 50%, #0d8396 100%);
+    }
+    .tap-highlight-none {
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex justify-center selection:bg-teal-200">
+
+  <!-- Mobile Container mimicking Telegram Mini App Frame -->
+  <div class="w-full max-w-md bg-[#e6f4f6] min-h-screen flex flex-col shadow-2xl relative pb-20 select-none overflow-x-hidden">
+    
+    <!-- TOP STATUS BAR (Telegram Web App Shell Top Bar) -->
+    <header class="bg-[#033b43] text-white px-4 py-2.5 flex items-center justify-between sticky top-0 z-40 border-b border-[#054b55]">
+      <div class="flex items-center space-x-2">
+        <span class="text-sm font-semibold tracking-wide text-slate-100">GGAS Student Support</span>
+      </div>
+      <div class="flex items-center space-x-3">
+        <!-- 3-Dots Menu Trigger -->
+        <button id="btn-top-menu" type="button" aria-label="Open menu" class="text-slate-300 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="5" r="2"></circle>
+            <circle cx="12" cy="12" r="2"></circle>
+            <circle cx="12" cy="19" r="2"></circle>
+          </svg>
+        </button>
+        <!-- Close Telegram WebApp button -->
+        <button id="btn-close-app" type="button" aria-label="Close app" class="text-slate-300 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Dropdown Menu (Matches Screenshot) -->
+      <div id="dropdown-menu" class="hidden absolute top-12 right-3 w-52 bg-white text-slate-700 rounded-2xl shadow-2xl py-2 z-50 border border-slate-100 transform transition-all duration-150">
+        <button id="menu-reload" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span>Reload Page</span>
+        </button>
+        <button id="menu-terms" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+          </svg>
+          <span>Terms of Use</span>
+        </button>
+        <button id="menu-privacy" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+          </svg>
+          <span>Privacy Policy</span>
+        </button>
+        <div class="h-px bg-slate-100 my-1"></div>
+        <button id="menu-report" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-red-50 flex items-center space-x-3 text-red-600">
+          <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01"></path>
+          </svg>
+          <span>Report</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- HEADER BRANDING & QUICK STATS BAR -->
+    <div class="bg-[#033b43] text-white px-5 pt-3 pb-6 rounded-b-[2rem] shadow-md">
+      <div class="flex items-start justify-between">
+        <div>
+          <h1 class="text-2xl font-black tracking-tight text-white leading-none">GGAS</h1>
+          <p class="text-xs font-normal text-teal-200 mt-1">Student Support</p>
+        </div>
+        
+        <!-- Right actions: Bell with badge 19, Connected status pill, 3 campuses badge -->
+        <div class="flex flex-col items-end space-y-2">
+          <div class="flex items-center space-x-2">
+            <!-- Notification Bell with badge 19 -->
+            <button id="btn-notifications" type="button" aria-label="Notifications" class="relative p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+              </svg>
+              <span id="notif-badge-count" class="absolute -top-1.5 -right-1.5 bg-[#e53935] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-[#033b43]">19</span>
+            </button>
+
+            <!-- Connected Status Pill -->
+            <div class="flex items-center space-x-1.5 bg-white/10 px-2.5 py-1 rounded-full text-[11px] font-medium text-emerald-300">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Connected</span>
+            </div>
+          </div>
+
+          <!-- Campuses Pill Button -->
+          <button id="btn-campuses" type="button" class="flex items-center space-x-1.5 bg-white/15 hover:bg-white/25 transition-all text-white px-3 py-1 rounded-full text-xs font-medium border border-white/20 shadow-sm">
+            <svg class="w-3.5 h-3.5 text-teal-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+            </svg>
+            <span>3 campuses</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN VIEW AREA: TABS (Home, History, Profile) -->
+    
+    <!-- TAB 1: HOME (Staff Workspace) -->
+    <main id="tab-content-home" class="flex-1 px-4 pt-4 space-y-4">
+      
+      <!-- Greeting and Workspace Header -->
+      <div class="px-1">
+        <p class="text-[11px] font-bold tracking-wider text-teal-800 uppercase">STAFF WORKSPACE</p>
+        <h2 id="greeting-title" class="text-2xl font-extrabold text-[#033b43] tracking-tight mt-0.5">Good morning, Chanseng</h2>
+      </div>
+
+      <!-- HERO BANNER CARD (Mental Health Awareness Month - Matches Screenshot Exactly) -->
+      <div id="card-mental-health" class="custom-gradient-card rounded-3xl p-5 text-white shadow-lg relative overflow-hidden cursor-pointer transform hover:scale-[1.01] transition-all">
+        <!-- Background subtle decorative shapes -->
+        <div class="absolute -right-8 -bottom-8 w-44 h-44 rounded-full bg-teal-400/10 pointer-events-none"></div>
+        <div class="absolute right-12 top-4 w-28 h-28 rounded-full bg-cyan-300/10 pointer-events-none"></div>
+
+        <div class="relative z-10 flex items-start justify-between">
+          <div class="max-w-[70%] space-y-2">
+            <span class="inline-block text-[10px] font-bold tracking-wider uppercase text-teal-200 bg-white/10 px-2 py-0.5 rounded-md">
+              MENTAL HEALTH AWARENESS MONTH
+            </span>
+            <h3 class="text-xl font-bold leading-tight tracking-tight text-white">
+              A little room to breathe.
+            </h3>
+            <p class="text-xs text-teal-100 font-normal leading-relaxed">
+              Small moments of kindness make a difference.
+            </p>
+          </div>
+
+          <!-- Awareness Ribbon Graphic (SVG representation matching screenshot) -->
+          <div class="w-16 h-20 flex-shrink-0 flex items-center justify-center pt-2">
+            <svg class="w-14 h-16 drop-shadow-md text-[#22d3ee]" viewBox="0 0 64 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M32 38C26 27 18 10 32 6C46 10 38 27 32 38Z" fill="#38bdf8" fill-opacity="0.95"/>
+              <path d="M28 34L10 74C13 72 20 68 26 58L34 44" stroke="#22d3ee" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M36 34L54 74C51 72 44 68 38 58L30 44" stroke="#0ea5e9" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="32" cy="18" r="6" fill="#033b43" fill-opacity="0.6"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs text-teal-100">
+          <span class="flex items-center space-x-1 font-medium">
+            <span>Wellness Protocol Active</span>
+          </span>
+          <span class="text-xs underline font-semibold text-white">View Guidelines &rarr;</span>
+        </div>
+      </div>
+
+      <!-- SEARCH BAR (Matches Screenshot) -->
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+        <input 
+          id="search-input" 
+          type="text" 
+          placeholder="Search tools and features" 
+          class="w-full bg-white text-slate-700 pl-11 pr-4 py-3 rounded-full text-sm font-medium shadow-sm border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#004d5a] focus:border-transparent transition-all placeholder-slate-400"
+        />
+        <button id="search-clear-btn" type="button" aria-label="Clear search" class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- QUICK TOOLS GRID -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-bold text-slate-600 uppercase tracking-wide">Quick Support Tools</span>
+          <span id="tools-count-badge" class="text-[11px] text-[#004d5a] font-semibold bg-teal-100/60 px-2 py-0.5 rounded-full">4 Tools</span>
+        </div>
+
+        <div id="tools-grid" class="grid grid-cols-2 gap-2.5">
+          <!-- Tool 1: Intake & Crisis -->
+          <button id="tool-crisis" type="button" class="bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all text-left group">
+            <div class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+            </div>
+            <div class="text-xs font-bold text-slate-800">Crisis Hotline</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Immediate student escalation</div>
+          </button>
+
+          <!-- Tool 2: Counseling Scheduler -->
+          <button id="tool-scheduler" type="button" class="bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all text-left group">
+            <div class="w-8 h-8 rounded-xl bg-teal-50 text-[#004d5a] flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <div class="text-xs font-bold text-slate-800">Book Counseling</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Schedule 1-on-1 session</div>
+          </button>
+
+          <!-- Tool 3: Case Queue -->
+          <button id="tool-tickets" type="button" class="bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all text-left group">
+            <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <div class="text-xs font-bold text-slate-800">Support Inquiries</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">8 active, 3 pending review</div>
+          </button>
+
+          <!-- Tool 4: Student Wellness Logs -->
+          <button id="tool-wellness" type="button" class="bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all text-left group">
+            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+              </svg>
+            </div>
+            <div class="text-xs font-bold text-slate-800">Wellness Check</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Record daily student log</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- ACTIVE STUDENT SUPPORT QUEUE -->
+      <div class="space-y-2.5 pt-1">
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-bold text-slate-600 uppercase tracking-wide">Recent Inquiries</span>
+          <div class="flex items-center space-x-1">
+            <button id="filter-all" type="button" class="text-[11px] font-semibold text-[#004d5a] bg-teal-100/70 px-2.5 py-0.5 rounded-full transition-colors">All</button>
+            <button id="filter-urgent" type="button" class="text-[11px] font-medium text-slate-500 hover:text-slate-800 px-2 py-0.5 rounded-full transition-colors">Urgent</button>
+          </div>
+        </div>
+
+        <div id="inquiries-container" class="space-y-2">
+          <!-- Card 1 -->
+          <div data-priority="urgent" class="inquiry-card bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm hover:border-teal-300 transition-all cursor-pointer">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span class="text-xs font-bold text-slate-800">Sothea Meas</span>
+                <span class="text-[10px] text-slate-400 font-mono">Gr 11 &bull; Sen Sok</span>
+              </div>
+              <span class="text-[10px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">Urgent</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-1.5 font-medium line-clamp-1">Exam anxiety and request for quiet test accommodation</p>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
+              <span>Submitted: 25 mins ago</span>
+              <span class="text-[#004d5a] font-semibold text-[11px] flex items-center space-x-0.5">
+                <span>Respond</span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </span>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div data-priority="normal" class="inquiry-card bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm hover:border-teal-300 transition-all cursor-pointer">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span class="text-xs font-bold text-slate-800">Davy Chea</span>
+                <span class="text-[10px] text-slate-400 font-mono">Gr 9 &bull; Toul Kork</span>
+              </div>
+              <span class="text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">Pending</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-1.5 font-medium line-clamp-1">Peer mediation follow-up and schedule adjustment</p>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
+              <span>Submitted: 2 hrs ago</span>
+              <span class="text-[#004d5a] font-semibold text-[11px] flex items-center space-x-0.5">
+                <span>Respond</span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </span>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div data-priority="normal" class="inquiry-card bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm hover:border-teal-300 transition-all cursor-pointer">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-teal-500"></span>
+                <span class="text-xs font-bold text-slate-800">Sovan Roth</span>
+                <span class="text-[10px] text-slate-400 font-mono">Gr 12 &bull; Main Campus</span>
+              </div>
+              <span class="text-[10px] font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-100">In Progress</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-1.5 font-medium line-clamp-1">College admission essay guidance and stress management</p>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
+              <span>Submitted: Yesterday</span>
+              <span class="text-[#004d5a] font-semibold text-[11px] flex items-center space-x-0.5">
+                <span>Respond</span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- TAB 2: HISTORY (Activity Logs) -->
+    <section id="tab-content-history" class="hidden flex-1 px-4 pt-4 space-y-4">
+      <div class="px-1">
+        <p class="text-[11px] font-bold tracking-wider text-teal-800 uppercase">ACTIVITY LOGS</p>
+        <h2 class="text-2xl font-extrabold text-[#033b43] tracking-tight mt-0.5">Counseling History</h2>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/70 shadow-sm space-y-3">
+        <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+          <span>Completed Sessions</span>
+          <span class="text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">14 this week</span>
+        </div>
+        <div class="space-y-3 text-xs divide-y divide-slate-100">
+          <div class="pt-2 flex justify-between items-start">
+            <div>
+              <div class="font-bold text-slate-800">Session with Rithy Panh (Gr 10)</div>
+              <div class="text-slate-500 text-[11px]">Academic stress & time management plan</div>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono">Yesterday 3:30 PM</span>
+          </div>
+          <div class="pt-2 flex justify-between items-start">
+            <div>
+              <div class="font-bold text-slate-800">Campus Wellness Walk - Toul Kork</div>
+              <div class="text-slate-500 text-[11px]">Mental Health Awareness activity with 42 students</div>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono">Oct 18, 2026</span>
+          </div>
+          <div class="pt-2 flex justify-between items-start">
+            <div>
+              <div class="font-bold text-slate-800">Parent-Counselor Consultation</div>
+              <div class="text-slate-500 text-[11px]">Sen Sok Campus - Grade 8 adjustment review</div>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono">Oct 16, 2026</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-export-history" type="button" class="w-full bg-white hover:bg-slate-50 text-[#004d5a] font-bold text-xs py-3 rounded-2xl border border-teal-200 shadow-sm transition-colors flex items-center justify-center space-x-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <span>Download Monthly Activity Summary</span>
+      </button>
+    </section>
+
+    <!-- TAB 3: PROFILE (Staff Profile & Bot Integration) -->
+    <section id="tab-content-profile" class="hidden flex-1 px-4 pt-4 space-y-4">
+      <div class="px-1">
+        <p class="text-[11px] font-bold tracking-wider text-teal-800 uppercase">STAFF DETAILS</p>
+        <h2 class="text-2xl font-extrabold text-[#033b43] tracking-tight mt-0.5">Staff Profile</h2>
+      </div>
+
+      <div class="bg-white rounded-3xl p-5 border border-slate-200/70 shadow-sm space-y-4">
+        <div class="flex items-center space-x-4">
+          <div class="w-14 h-14 rounded-2xl bg-[#004d5a] text-white flex items-center justify-center text-xl font-bold shadow-md">
+            CS
+          </div>
+          <div>
+            <h3 id="profile-name" class="text-base font-extrabold text-slate-800">Chanseng Kim</h3>
+            <p class="text-xs text-teal-700 font-semibold">Lead Student Support Counselor</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 font-mono">ID: GGAS-STF-8492 &bull; Active</p>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-3 space-y-2 text-xs">
+          <div class="flex justify-between py-1 text-slate-600">
+            <span class="text-slate-400">Assigned Campuses</span>
+            <span class="font-bold text-slate-800">Main, Toul Kork, Sen Sok</span>
+          </div>
+          <div class="flex justify-between py-1 text-slate-600">
+            <span class="text-slate-400">Telegram Bot</span>
+            <span class="font-bold text-[#004d5a]">@ggas_support_bot</span>
+          </div>
+          <div class="flex justify-between py-1 text-slate-600">
+            <span class="text-slate-400">Active Shift</span>
+            <span class="font-bold text-emerald-600">On Duty (7:30 AM - 4:30 PM)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Telegram WebApp Integration Controls -->
+      <div class="bg-teal-50/70 rounded-2xl p-4 border border-teal-200/70 space-y-2.5">
+        <h4 class="text-xs font-bold text-[#004d5a] uppercase tracking-wide">Telegram Bot Integration</h4>
+        <p class="text-xs text-slate-600">Test sending synchronized data back to the Telegram Bot via Telegram WebApp SDK.</p>
+        
+        <button id="btn-telegram-sync" type="button" class="w-full bg-[#004d5a] hover:bg-[#033b43] text-white text-xs font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .39z"/>
+          </svg>
+          <span>Send Status to @ggas_support_bot</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- BOTTOM FIXED NAVIGATION (Home, History, Profile - Matches Screenshot) -->
+    <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-slate-200/80 px-6 py-2.5 flex items-center justify-between z-30 shadow-lg">
+      
+      <!-- Home Tab (Active pill style in screenshot: rounded dark teal pill with white icon/text) -->
+      <button id="nav-btn-home" type="button" class="flex items-center space-x-2 bg-[#004d5a] text-white px-5 py-2 rounded-2xl font-bold text-xs shadow-md transition-transform active:scale-95">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+        </svg>
+        <span>Home</span>
+      </button>
+
+      <!-- History Tab -->
+      <button id="nav-btn-history" type="button" class="flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span class="text-[11px]">History</span>
+      </button>
+
+      <!-- Profile Tab -->
+      <button id="nav-btn-profile" type="button" class="flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+        </svg>
+        <span class="text-[11px]">Profile</span>
+      </button>
+
+    </nav>
+
+    <!-- BOT FOOTER CREDIT (Matches screenshot text "@ggas_support_bot") -->
+    <div class="text-center py-3 text-[11px] font-mono text-slate-400">
+      @ggas_support_bot
+    </div>
+
+    <!-- MODAL / POPUPS CONTAINER -->
+
+    <!-- Modal 1: Campus Info -->
+    <div id="modal-campuses" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-lg font-bold text-[#033b43]">GGAS Campuses</span>
+            <span class="text-xs bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded-full">3 Active</span>
+          </div>
+          <button id="close-modal-campuses" type="button" class="text-slate-400 hover:text-slate-600 p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div class="space-y-3 text-xs">
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div class="font-bold text-slate-800">1. Phnom Penh Central Campus</div>
+            <p class="text-slate-500 text-[11px] mt-0.5">Primary Counseling Office &bull; Grades 9-12</p>
+            <p class="text-[#004d5a] font-mono text-[10px] mt-1">Tel: +855 23 888 101</p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div class="font-bold text-slate-800">2. Toul Kork Campus</div>
+            <p class="text-slate-500 text-[11px] mt-0.5">Student Wellness Wing &bull; Grades 6-8</p>
+            <p class="text-[#004d5a] font-mono text-[10px] mt-1">Tel: +855 23 888 102</p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div class="font-bold text-slate-800">3. Sen Sok Campus</div>
+            <p class="text-slate-500 text-[11px] mt-0.5">Early Education & Learning Support &bull; Grades K-5</p>
+            <p class="text-[#004d5a] font-mono text-[10px] mt-1">Tel: +855 23 888 103</p>
+          </div>
+        </div>
+        <button id="btn-done-campuses" type="button" class="w-full bg-[#004d5a] text-white text-xs font-bold py-2.5 rounded-xl shadow-md">
+          Close Window
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal 2: Notifications Drawer (19 unread) -->
+    <div id="modal-notifications" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-end justify-center">
+      <div class="bg-white rounded-t-3xl max-w-md w-full p-5 space-y-4 shadow-2xl max-h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-base font-bold text-[#033b43]">Notifications</span>
+            <span class="text-xs bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">19 Updates</span>
+          </div>
+          <button id="close-modal-notifs" type="button" class="text-slate-400 hover:text-slate-600 p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div class="overflow-y-auto space-y-2.5 text-xs flex-1 pr-1">
+          <div class="p-3 bg-rose-50/70 border border-rose-100 rounded-2xl">
+            <div class="flex justify-between items-center text-rose-700 font-bold">
+              <span>Urgent Counseling Request</span>
+              <span class="text-[10px] font-normal">10m ago</span>
+            </div>
+            <p class="text-slate-600 mt-1">Grade 11 exam distress referral from Homeroom Teacher.</p>
+          </div>
+          <div class="p-3 bg-teal-50/70 border border-teal-100 rounded-2xl">
+            <div class="flex justify-between items-center text-[#004d5a] font-bold">
+              <span>Mental Health Month Activity</span>
+              <span class="text-[10px] font-normal">1h ago</span>
+            </div>
+            <p class="text-slate-600 mt-1">"Breathe Room" meditation station opened in Toul Kork campus.</p>
+          </div>
+          <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+            <div class="flex justify-between items-center text-slate-800 font-bold">
+              <span>Peer Mediation Follow-up</span>
+              <span class="text-[10px] font-normal">3h ago</span>
+            </div>
+            <p class="text-slate-600 mt-1">Notes logged for student Davy Chea.</p>
+          </div>
+        </div>
+        <button id="btn-mark-all-read" type="button" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2.5 rounded-xl transition-colors">
+          Mark All As Read
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal 3: Terms / Privacy / Report Generic Dialog -->
+    <div id="modal-policy" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 id="policy-modal-title" class="text-base font-bold text-[#033b43]">Document</h3>
+          <button id="close-modal-policy" type="button" class="text-slate-400 hover:text-slate-600 p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div id="policy-modal-body" class="text-xs text-slate-600 leading-relaxed max-h-60 overflow-y-auto space-y-2">
+          <!-- Dynamically filled -->
+        </div>
+        <button id="btn-policy-close" type="button" class="w-full bg-[#004d5a] text-white text-xs font-bold py-2.5 rounded-xl shadow-md">
+          Acknowledge & Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal 4: Inquiry Response & Detail -->
+    <div id="modal-inquiry" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div>
+            <h3 id="inquiry-modal-name" class="text-base font-bold text-slate-800">Student Case</h3>
+            <p id="inquiry-modal-subtitle" class="text-[11px] text-teal-700 font-medium">Campus Information</p>
+          </div>
+          <button id="close-modal-inquiry" type="button" class="text-slate-400 hover:text-slate-600 p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div class="space-y-2 text-xs">
+          <p id="inquiry-modal-desc" class="text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            Case notes description.
+          </p>
+          <label for="counselor-notes" class="block font-bold text-slate-700 pt-1">Counselor Response / Action Taken:</label>
+          <textarea id="counselor-notes" rows="3" placeholder="Type counseling note or scheduled follow-up..." class="w-full text-xs p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d5a]"></textarea>
+        </div>
+        <div class="flex space-x-2 pt-1">
+          <button id="btn-resolve-case" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition-colors shadow-sm">
+            Resolve Case
+          </button>
+          <button id="btn-send-to-bot" type="button" class="flex-1 bg-[#004d5a] hover:bg-[#033b43] text-white font-bold text-xs py-2.5 rounded-xl transition-colors shadow-sm flex items-center justify-center space-x-1">
+            <span>Sync to Bot</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast" class="hidden fixed top-16 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white text-xs px-4 py-2.5 rounded-full shadow-2xl z-50 flex items-center space-x-2 backdrop-blur-sm transition-all duration-200">
+      <span id="toast-icon">✓</span>
+      <span id="toast-text">Action completed</span>
+    </div>
+
+  </div>
+
+  <!-- APPLICATION JAVASCRIPT -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // 1. Initialize Telegram WebApp SDK if available
+      var tg = window.Telegram ? window.Telegram.WebApp : null;
+      if (tg) {
+        try {
+          tg.ready();
+          tg.expand();
+          if (tg.setHeaderColor) tg.setHeaderColor('#033b43');
+          if (tg.setBackgroundColor) tg.setBackgroundColor('#e6f4f6');
+          
+          // Personalize greeting with real Telegram user if present
+          if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            var firstName = tg.initDataUnsafe.user.first_name || 'Chanseng';
+            var greetingElem = document.getElementById('greeting-title');
+            if (greetingElem) {
+              greetingElem.textContent = 'Good morning, ' + firstName;
+            }
+            var profileElem = document.getElementById('profile-name');
+            if (profileElem) {
+              profileElem.textContent = firstName + ' ' + (tg.initDataUnsafe.user.last_name || 'Kim');
+            }
+          }
+        } catch (e) {
+          console.log('Telegram WebApp init error', e);
+        }
+      }
+
+      // Helper: Show Toast notification
+      function showToast(text, isSuccess) {
+        var toast = document.getElementById('toast');
+        var toastText = document.getElementById('toast-text');
+        var toastIcon = document.getElementById('toast-icon');
+        if (!toast || !toastText) return;
+
+        toastText.textContent = text;
+        toastIcon.textContent = isSuccess ? '✓' : 'ℹ';
+        toast.classList.remove('hidden');
+        setTimeout(function () {
+          toast.classList.add('hidden');
+        }, 2800);
+
+        // Haptic feedback if in Telegram
+        if (tg && tg.HapticFeedback) {
+          try {
+            tg.HapticFeedback.notificationOccurred(isSuccess ? 'success' : 'warning');
+          } catch (err) {}
+        }
+      }
+
+      // 2. Dropdown Menu Toggle (Reload, Terms, Privacy, Report)
+      var btnTopMenu = document.getElementById('btn-top-menu');
+      var dropdownMenu = document.getElementById('dropdown-menu');
+
+      if (btnTopMenu && dropdownMenu) {
+        btnTopMenu.addEventListener('click', function (e) {
+          e.stopPropagation();
+          dropdownMenu.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', function () {
+          if (!dropdownMenu.classList.contains('hidden')) {
+            dropdownMenu.classList.add('hidden');
+          }
+        });
+      }
+
+      // Close app button
+      var btnCloseApp = document.getElementById('btn-close-app');
+      if (btnCloseApp) {
+        btnCloseApp.addEventListener('click', function () {
+          if (tg) {
+            try {
+              tg.close();
+            } catch (err) {
+              showToast('Closing GGAS Student Support Portal', true);
+            }
+          } else {
+            showToast('Closing GGAS Student Support Portal', true);
+          }
+        });
+      }
+
+      // Menu Actions
+      var menuReload = document.getElementById('menu-reload');
+      if (menuReload) {
+        menuReload.addEventListener('click', function () {
+          dropdownMenu.classList.add('hidden');
+          showToast('Refreshing student support feeds...', true);
+          setTimeout(function () {
+            showToast('Support portal synced with 3 campuses', true);
+          }, 800);
+        });
+      }
+
+      var policyModal = document.getElementById('modal-policy');
+      var policyTitle = document.getElementById('policy-modal-title');
+      var policyBody = document.getElementById('policy-modal-body');
+
+      function openPolicyModal(title, content) {
+        if (!policyModal || !policyTitle || !policyBody) return;
+        policyTitle.textContent = title;
+        policyBody.innerHTML = content;
+        policyModal.classList.remove('hidden');
+      }
+
+      var menuTerms = document.getElementById('menu-terms');
+      if (menuTerms) {
+        menuTerms.addEventListener('click', function () {
+          dropdownMenu.classList.add('hidden');
+          openPolicyModal('GGAS Staff Terms of Use', 
+            '<p><strong>1. Staff Confidentiality:</strong> All student psychological and academic records accessed via the GGAS Student Support Bot are strictly confidential under GGAS Child Safeguarding protocols.</p><p><strong>2. Emergency Protocol:</strong> Imminent risks must be escalated immediately to the designated Campus Safeguarding Lead.</p><p><strong>3. Official Records:</strong> Case notes entered here synchronize directly with the central GGAS Student Support database.</p>'
+          );
+        });
+      }
+
+      var menuPrivacy = document.getElementById('menu-privacy');
+      if (menuPrivacy) {
+        menuPrivacy.addEventListener('click', function () {
+          dropdownMenu.classList.add('hidden');
+          openPolicyModal('Student Data Privacy Policy',
+            '<p><strong>Data Protection Notice:</strong> GGAS Student Support adheres to international student data standards and FERPA-aligned guidelines.</p><p><strong>Encrypted Transmission:</strong> Communications between Telegram Mini App and GGAS backend servers use TLS 1.3 encryption with role-based staff authentication.</p>'
+          );
+        });
+      }
+
+      var menuReport = document.getElementById('menu-report');
+      if (menuReport) {
+        menuReport.addEventListener('click', function () {
+          dropdownMenu.classList.add('hidden');
+          openPolicyModal('Report Incident or System Issue',
+            '<p>Need to report an urgent student concern or technical malfunction?</p><p class="text-slate-700 font-semibold mt-2">Counselor Hotline: +855 23 888 100</p><p class="text-slate-700 font-semibold">IT Support Desk: it-support@ggas.edu.kh</p><p class="mt-2 text-slate-500">Your current workspace session ID has been logged for swift triage.</p>'
+          );
+        });
+      }
+
+      var closePolicyBtn = document.getElementById('close-modal-policy');
+      var btnPolicyClose = document.getElementById('btn-policy-close');
+      if (closePolicyBtn && policyModal) {
+        closePolicyBtn.addEventListener('click', function () {
+          policyModal.classList.add('hidden');
+        });
+      }
+      if (btnPolicyClose && policyModal) {
+        btnPolicyClose.addEventListener('click', function () {
+          policyModal.classList.add('hidden');
+        });
+      }
+
+      // 3. Campuses Modal
+      var btnCampuses = document.getElementById('btn-campuses');
+      var modalCampuses = document.getElementById('modal-campuses');
+      var closeModalCampuses = document.getElementById('close-modal-campuses');
+      var btnDoneCampuses = document.getElementById('btn-done-campuses');
+
+      if (btnCampuses && modalCampuses) {
+        btnCampuses.addEventListener('click', function () {
+          modalCampuses.classList.remove('hidden');
+        });
+      }
+      if (closeModalCampuses && modalCampuses) {
+        closeModalCampuses.addEventListener('click', function () {
+          modalCampuses.classList.add('hidden');
+        });
+      }
+      if (btnDoneCampuses && modalCampuses) {
+        btnDoneCampuses.addEventListener('click', function () {
+          modalCampuses.classList.add('hidden');
+        });
+      }
+
+      // 4. Notifications Drawer
+      var btnNotifs = document.getElementById('btn-notifications');
+      var modalNotifs = document.getElementById('modal-notifications');
+      var closeModalNotifs = document.getElementById('close-modal-notifs');
+      var btnMarkAllRead = document.getElementById('btn-mark-all-read');
+      var notifBadge = document.getElementById('notif-badge-count');
+
+      if (btnNotifs && modalNotifs) {
+        btnNotifs.addEventListener('click', function () {
+          modalNotifs.classList.remove('hidden');
+        });
+      }
+      if (closeModalNotifs && modalNotifs) {
+        closeModalNotifs.addEventListener('click', function () {
+          modalNotifs.classList.add('hidden');
+        });
+      }
+      if (btnMarkAllRead && modalNotifs && notifBadge) {
+        btnMarkAllRead.addEventListener('click', function () {
+          notifBadge.textContent = '0';
+          notifBadge.classList.add('hidden');
+          modalNotifs.classList.add('hidden');
+          showToast('All 19 notifications marked as read', true);
+        });
+      }
+
+      // 5. Mental Health Month Banner Card Click
+      var cardMentalHealth = document.getElementById('card-mental-health');
+      if (cardMentalHealth) {
+        cardMentalHealth.addEventListener('click', function () {
+          openPolicyModal('Mental Health Awareness Month - Staff Guidelines',
+            '<p class="font-bold text-teal-800">"A little room to breathe."</p><p class="mt-1">During this awareness month, counselors and staff are encouraging active listening and brief 5-minute mindfulness pauses before class transitions.</p><p class="mt-2"><strong>Counselor Actions:</strong></p><ul class="list-disc pl-4 space-y-1 mt-1 text-slate-600"><li>Distribute Teal Kindness ribbons to campus student ambassadors.</li><li>Facilitate quiet-corner study rooms for test anxiety relief.</li><li>Record student self-referral wellness requests daily.</li></ul>'
+          );
+        });
+      }
+
+      // 6. Navigation Tabs (Home, History, Profile)
+      var navHome = document.getElementById('nav-btn-home');
+      var navHistory = document.getElementById('nav-btn-history');
+      var navProfile = document.getElementById('nav-btn-profile');
+
+      var contentHome = document.getElementById('tab-content-home');
+      var contentHistory = document.getElementById('tab-content-history');
+      var contentProfile = document.getElementById('tab-content-profile');
+
+      function switchTab(activeTab) {
+        // Hide all
+        if (contentHome) contentHome.classList.add('hidden');
+        if (contentHistory) contentHistory.classList.add('hidden');
+        if (contentProfile) contentProfile.classList.add('hidden');
+
+        // Reset nav styles
+        if (navHome) {
+          navHome.className = 'flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors';
+          navHome.innerHTML = '<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg><span class="text-[11px]">Home</span>';
+        }
+        if (navHistory) {
+          navHistory.className = 'flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors';
+          navHistory.innerHTML = '<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span class="text-[11px]">History</span>';
+        }
+        if (navProfile) {
+          navProfile.className = 'flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors';
+          navProfile.innerHTML = '<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg><span class="text-[11px]">Profile</span>';
+        }
+
+        if (activeTab === 'home' && contentHome && navHome) {
+          contentHome.classList.remove('hidden');
+          navHome.className = 'flex items-center space-x-2 bg-[#004d5a] text-white px-5 py-2 rounded-2xl font-bold text-xs shadow-md transition-transform active:scale-95';
+          navHome.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg><span>Home</span>';
+        } else if (activeTab === 'history' && contentHistory && navHistory) {
+          contentHistory.classList.remove('hidden');
+          navHistory.className = 'flex items-center space-x-2 bg-[#004d5a] text-white px-5 py-2 rounded-2xl font-bold text-xs shadow-md transition-transform active:scale-95';
+          navHistory.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>History</span>';
+        } else if (activeTab === 'profile' && contentProfile && navProfile) {
+          contentProfile.classList.remove('hidden');
+          navProfile.className = 'flex items-center space-x-2 bg-[#004d5a] text-white px-5 py-2 rounded-2xl font-bold text-xs shadow-md transition-transform active:scale-95';
+          navProfile.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg><span>Profile</span>';
+        }
+      }
+
+      if (navHome) navHome.addEventListener('click', function () { switchTab('home'); });
+      if (navHistory) navHistory.addEventListener('click', function () { switchTab('history'); });
+      if (navProfile) navProfile.addEventListener('click', function () { switchTab('profile'); });
+
+      // 7. Search Filter Functionality
+      var searchInput = document.getElementById('search-input');
+      var searchClearBtn = document.getElementById('search-clear-btn');
+      var inquiryCards = document.querySelectorAll('.inquiry-card');
+
+      if (searchInput) {
+        searchInput.addEventListener('input', function () {
+          var query = this.value.trim().toLowerCase();
+          if (searchClearBtn) {
+            if (query.length > 0) {
+              searchClearBtn.classList.remove('hidden');
+            } else {
+              searchClearBtn.classList.add('hidden');
+            }
+          }
+
+          inquiryCards.forEach(function (card) {
+            var text = card.textContent.toLowerCase();
+            if (text.indexOf(query) !== -1) {
+              card.classList.remove('hidden');
+            } else {
+              card.classList.add('hidden');
+            }
+          });
+        });
+
+        if (searchClearBtn) {
+          searchClearBtn.addEventListener('click', function () {
+            searchInput.value = '';
+            searchClearBtn.classList.add('hidden');
+            inquiryCards.forEach(function (card) {
+              card.classList.remove('hidden');
+            });
+          });
+        }
+      }
+
+      // Filter Buttons (All vs Urgent)
+      var filterAll = document.getElementById('filter-all');
+      var filterUrgent = document.getElementById('filter-urgent');
+
+      if (filterAll && filterUrgent) {
+        filterAll.addEventListener('click', function () {
+          filterAll.className = 'text-[11px] font-semibold text-[#004d5a] bg-teal-100/70 px-2.5 py-0.5 rounded-full transition-colors';
+          filterUrgent.className = 'text-[11px] font-medium text-slate-500 hover:text-slate-800 px-2 py-0.5 rounded-full transition-colors';
+          inquiryCards.forEach(function (card) {
+            card.classList.remove('hidden');
+          });
+        });
+
+        filterUrgent.addEventListener('click', function () {
+          filterUrgent.className = 'text-[11px] font-semibold text-rose-600 bg-rose-100/80 px-2.5 py-0.5 rounded-full transition-colors';
+          filterAll.className = 'text-[11px] font-medium text-slate-500 hover:text-slate-800 px-2 py-0.5 rounded-full transition-colors';
+          inquiryCards.forEach(function (card) {
+            if (card.getAttribute('data-priority') === 'urgent') {
+              card.classList.remove('hidden');
+            } else {
+              card.classList.add('hidden');
+            }
+          });
+        });
+      }
+
+      // 8. Quick Tools Interaction
+      var toolCrisis = document.getElementById('tool-crisis');
+      if (toolCrisis) {
+        toolCrisis.addEventListener('click', function () {
+          openPolicyModal('Campus Crisis Protocol',
+            '<div class="p-3 bg-rose-50 rounded-xl text-rose-800 mb-2 font-bold">EMERGENCY PROTOCOL ACTIVE</div><p>Immediate 24/7 GGAS Crisis Counselor Hotline:</p><p class="text-base font-extrabold text-slate-900 mt-1">+855 23 888 999</p><p class="mt-2 text-slate-500 text-[11px]">Calling or syncing sends an instant dispatch alert to campus nurse & head of school.</p>'
+          );
+        });
+      }
+
+      var toolScheduler = document.getElementById('tool-scheduler');
+      if (toolScheduler) {
+        toolScheduler.addEventListener('click', function () {
+          showToast('Opening Counselor Booking Calendar...', true);
+        });
+      }
+
+      var toolTickets = document.getElementById('tool-tickets');
+      if (toolTickets) {
+        toolTickets.addEventListener('click', function () {
+          showToast('Loaded 8 active inquiries', true);
+        });
+      }
+
+      var toolWellness = document.getElementById('tool-wellness');
+      if (toolWellness) {
+        toolWellness.addEventListener('click', function () {
+          showToast('Wellness check-in sheet ready', true);
+        });
+      }
+
+      // 9. Inquiry Card Click & Response Modal
+      var modalInquiry = document.getElementById('modal-inquiry');
+      var inquiryModalName = document.getElementById('inquiry-modal-name');
+      var inquiryModalSubtitle = document.getElementById('inquiry-modal-subtitle');
+      var inquiryModalDesc = document.getElementById('inquiry-modal-desc');
+      var closeModalInquiry = document.getElementById('close-modal-inquiry');
+      var btnResolveCase = document.getElementById('btn-resolve-case');
+      var btnSendToBot = document.getElementById('btn-send-to-bot');
+      var counselorNotes = document.getElementById('counselor-notes');
+
+      var currentSelectedCard = null;
+
+      inquiryCards.forEach(function (card) {
+        card.addEventListener('click', function () {
+          currentSelectedCard = card;
+          var name = card.querySelector('.text-slate-800') ? card.querySelector('.text-slate-800').textContent : 'Student';
+          var sub = card.querySelector('.font-mono') ? card.querySelector('.font-mono').textContent : '';
+          var desc = card.querySelector('.line-clamp-1') ? card.querySelector('.line-clamp-1').textContent : '';
+
+          if (inquiryModalName) inquiryModalName.textContent = name;
+          if (inquiryModalSubtitle) inquiryModalSubtitle.textContent = sub;
+          if (inquiryModalDesc) inquiryModalDesc.textContent = desc;
+          if (counselorNotes) counselorNotes.value = '';
+
+          if (modalInquiry) modalInquiry.classList.remove('hidden');
+        });
+      });
+
+      if (closeModalInquiry && modalInquiry) {
+        closeModalInquiry.addEventListener('click', function () {
+          modalInquiry.classList.add('hidden');
+        });
+      }
+
+      if (btnResolveCase && modalInquiry) {
+        btnResolveCase.addEventListener('click', function () {
+          modalInquiry.classList.add('hidden');
+          if (currentSelectedCard) {
+            currentSelectedCard.style.opacity = '0.5';
+            var badge = currentSelectedCard.querySelector('span[class*="rounded-full"]');
+            if (badge) {
+              badge.textContent = 'Resolved';
+              badge.className = 'text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100';
+            }
+          }
+          showToast('Case marked as resolved & logged', true);
+        });
+      }
+
+      // Sync data to Telegram Bot via WebApp.sendData()
+      function sendDataToBot(payload) {
+        if (tg && typeof tg.sendData === 'function') {
+          try {
+            tg.sendData(JSON.stringify(payload));
+            showToast('Synced to Telegram Bot @ggas_support_bot', true);
+          } catch (e) {
+            showToast('Data payload prepared: ' + payload.action, true);
+          }
+        } else {
+          showToast('Data payload synchronized: ' + payload.action, true);
+        }
+      }
+
+      if (btnSendToBot && modalInquiry) {
+        btnSendToBot.addEventListener('click', function () {
+          var name = inquiryModalName ? inquiryModalName.textContent : 'Unknown';
+          var note = counselorNotes ? counselorNotes.value : 'Case follow-up complete.';
+          sendDataToBot({
+            action: 'case_update',
+            student: name,
+            notes: note || 'Follow-up consultation conducted.',
+            timestamp: new Date().toISOString()
+          });
+          modalInquiry.classList.add('hidden');
+        });
+      }
+
+      var btnTelegramSync = document.getElementById('btn-telegram-sync');
+      if (btnTelegramSync) {
+        btnTelegramSync.addEventListener('click', function () {
+          sendDataToBot({
+            action: 'staff_sync',
+            staff: 'Chanseng Kim',
+            status: 'On Duty',
+            campuses: ['Main', 'Toul Kork', 'Sen Sok'],
+            timestamp: new Date().toISOString()
+          });
+        });
+      }
+
+      var btnExportHistory = document.getElementById('btn-export-history');
+      if (btnExportHistory) {
+        btnExportHistory.addEventListener('click', function () {
+          showToast('Exporting activity summary PDF...', true);
+        });
+      }
+
+    });
+  </script>
+</body>
+</html>
