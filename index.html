@@ -3,11 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>GGAS Student Support - Telegram Mini App</title>
+  <title>GGAS Student Support - Portal & Dashboard</title>
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <!-- jsPDF & html2canvas for PDF and High-Res Image Downloads -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -32,6 +36,7 @@
     /* Custom scrollbar and styling matching Telegram WebApp */
     ::-webkit-scrollbar {
       width: 4px;
+      height: 4px;
     }
     ::-webkit-scrollbar-thumb {
       background: rgba(0, 77, 90, 0.2);
@@ -43,6 +48,13 @@
     .tap-highlight-none {
       -webkit-tap-highlight-color: transparent;
     }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .pulse-subtle {
+      animation: pulse-subtle 2s infinite ease-in-out;
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex justify-center selection:bg-teal-200">
@@ -51,11 +63,17 @@
   <div class="w-full max-w-md bg-[#e6f4f6] min-h-screen flex flex-col shadow-2xl relative pb-20 select-none overflow-x-hidden">
     
     <!-- TOP STATUS BAR (Telegram Web App Shell Top Bar) -->
-    <header class="bg-[#033b43] text-white px-4 py-2.5 flex items-center justify-between sticky top-0 z-40 border-b border-[#054b55]">
+    <header class="bg-[#033b43] text-white px-4 py-2 flex items-center justify-between sticky top-0 z-40 border-b border-[#054b55]">
       <div class="flex items-center space-x-2">
-        <span class="text-sm font-semibold tracking-wide text-slate-100">GGAS Student Support</span>
+        <span class="text-sm font-bold tracking-wide text-slate-100">GGAS Student Support</span>
+        <span class="text-[9px] bg-teal-500/30 text-teal-200 font-mono px-1.5 py-0.5 rounded border border-teal-400/30">v3.0 DB</span>
       </div>
-      <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2">
+        <!-- Live Auto-Save Indicator -->
+        <span id="auto-save-status" class="text-[10px] text-emerald-300 font-medium flex items-center space-x-1 bg-white/10 px-2 py-0.5 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Auto-Saved</span>
+        </span>
         <!-- 3-Dots Menu Trigger -->
         <button id="btn-top-menu" type="button" aria-label="Open menu" class="text-slate-300 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -72,538 +90,978 @@
         </button>
       </div>
 
-      <!-- Dropdown Menu (Matches Screenshot) -->
-      <div id="dropdown-menu" class="hidden absolute top-12 right-3 w-52 bg-white text-slate-700 rounded-2xl shadow-2xl py-2 z-50 border border-slate-100 transform transition-all duration-150">
-        <button id="menu-reload" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
+      <!-- Dropdown Menu -->
+      <div id="dropdown-menu" class="hidden absolute top-11 right-3 w-56 bg-white text-slate-700 rounded-2xl shadow-2xl py-2 z-50 border border-slate-100 transform transition-all duration-150">
+        <button id="menu-switch-user" type="button" class="w-full px-4 py-2.5 text-left text-xs font-semibold hover:bg-teal-50 flex items-center space-x-3 text-slate-700">
+          <svg class="w-4 h-4 text-[#004d5a]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+          </svg>
+          <span>Switch Staff User / Rights</span>
+        </button>
+        <button id="menu-reload" type="button" class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
           <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
           </svg>
-          <span>Reload Page</span>
+          <span>Reload & Sync Database</span>
         </button>
-        <button id="menu-terms" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
+        <button id="menu-terms" type="button" class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
           <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
           </svg>
-          <span>Terms of Use</span>
+          <span>Terms & Child Safeguarding</span>
         </button>
-        <button id="menu-privacy" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
+        <button id="menu-privacy" type="button" class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-slate-50 flex items-center space-x-3 text-slate-700">
           <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
           </svg>
-          <span>Privacy Policy</span>
+          <span>Privacy & Confidentiality</span>
         </button>
         <div class="h-px bg-slate-100 my-1"></div>
-        <button id="menu-report" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-red-50 flex items-center space-x-3 text-red-600">
+        <button id="menu-report" type="button" class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-red-50 flex items-center space-x-3 text-red-600">
           <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="9"></circle>
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01"></path>
           </svg>
-          <span>Report</span>
+          <span>Emergency Incident Report</span>
         </button>
       </div>
     </header>
 
-    <!-- HEADER BRANDING & QUICK STATS BAR -->
-    <div class="bg-[#033b43] text-white px-5 pt-3 pb-6 rounded-b-[2rem] shadow-md">
-      <div class="flex items-start justify-between">
-        <div>
-          <h1 class="text-2xl font-black tracking-tight text-white leading-none">GGAS</h1>
-          <p class="text-xs font-normal text-teal-200 mt-1">Student Support</p>
-        </div>
-        
-        <!-- Right actions: Bell with badge 19, Connected status pill, 3 campuses badge -->
-        <div class="flex flex-col items-end space-y-2">
-          <div class="flex items-center space-x-2">
-            <!-- Notification Bell with badge 19 -->
-            <button id="btn-notifications" type="button" aria-label="Notifications" class="relative p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-              </svg>
-              <span id="notif-badge-count" class="absolute -top-1.5 -right-1.5 bg-[#e53935] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-[#033b43]">19</span>
-            </button>
-
-            <!-- Connected Status Pill -->
-            <div class="flex items-center space-x-1.5 bg-white/10 px-2.5 py-1 rounded-full text-[11px] font-medium text-emerald-300">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Connected</span>
-            </div>
+    <!-- ACTIVE USER & BRANDING BANNER -->
+    <div class="bg-[#033b43] text-white px-5 pt-2 pb-5 rounded-b-[2rem] shadow-md space-y-3">
+      <div class="flex items-center justify-between">
+        <!-- Active Staff Profile Pill (Clickable User Switcher) -->
+        <button id="btn-user-banner" type="button" class="flex items-center space-x-2.5 bg-white/10 hover:bg-white/20 p-1.5 pr-3 rounded-full transition-all border border-white/15 text-left">
+          <div id="user-avatar" class="w-8 h-8 rounded-full bg-teal-500 text-white font-black text-xs flex items-center justify-center shadow-inner">
+            CK
           </div>
+          <div>
+            <div class="flex items-center space-x-1.5">
+              <span id="user-display-name" class="text-xs font-bold text-white leading-tight">Chanseng Kim</span>
+              <span id="user-role-badge" class="text-[9px] bg-amber-400/90 text-slate-900 font-extrabold px-1.5 py-0.2 rounded">ADMIN</span>
+            </div>
+            <div id="user-campus-label" class="text-[10px] text-teal-200 leading-tight">All Campuses &bull; Tap to switch</div>
+          </div>
+        </button>
 
-          <!-- Campuses Pill Button -->
-          <button id="btn-campuses" type="button" class="flex items-center space-x-1.5 bg-white/15 hover:bg-white/25 transition-all text-white px-3 py-1 rounded-full text-xs font-medium border border-white/20 shadow-sm">
-            <svg class="w-3.5 h-3.5 text-teal-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+        <!-- Right Quick Controls: Notification & Campuses -->
+        <div class="flex items-center space-x-1.5">
+          <button id="btn-notifications" type="button" aria-label="Notifications" class="relative p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
             </svg>
-            <span>3 campuses</span>
+            <span id="notif-badge-count" class="absolute -top-1 -right-1 bg-[#e53935] text-white text-[9px] font-bold px-1 rounded-full ring-2 ring-[#033b43]">19</span>
+          </button>
+          
+          <button id="btn-campuses" type="button" class="flex items-center space-x-1 bg-white/15 hover:bg-white/25 text-white px-2.5 py-1.5 rounded-full text-[11px] font-semibold border border-white/20">
+            <span>3 Campuses</span>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- MAIN VIEW AREA: TABS (Home, History, Profile) -->
+    <!-- MAIN VIEW AREA: TABS (Home, Dashboard, History, Profile) -->
     
-    <!-- TAB 1: HOME (Staff Workspace) -->
-    <main id="tab-content-home" class="flex-1 px-4 pt-4 space-y-4">
+    <!-- ======================================================== -->
+    <!-- TAB 1: HOME (Staff Workspace & Live Cases) -->
+    <!-- ======================================================== -->
+    <main id="tab-content-home" class="flex-1 px-4 pt-3 space-y-3.5">
       
-      <!-- Greeting and Workspace Header -->
-      <div class="px-1">
-        <p class="text-[11px] font-bold tracking-wider text-teal-800 uppercase">STAFF WORKSPACE</p>
-        <h2 id="greeting-title" class="text-2xl font-extrabold text-[#033b43] tracking-tight mt-0.5">Good morning, Chanseng</h2>
+      <!-- Greeting and DB Live Badge -->
+      <div class="px-1 flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold tracking-wider text-teal-800 uppercase">STAFF WORKSPACE</p>
+          <h2 id="greeting-title" class="text-xl font-extrabold text-[#033b43] tracking-tight">Welcome, Chanseng 069</h2>
+        </div>
+        <div class="flex items-center space-x-1.5">
+          <span id="db-records-count" class="text-[10px] font-mono bg-teal-100 text-[#004d5a] font-bold px-2 py-0.5 rounded-full border border-teal-200">
+            3 Cases in DB
+          </span>
+        </div>
       </div>
 
-      <!-- HERO BANNER CARD (Mental Health Awareness Month - Matches Screenshot Exactly) -->
-      <div id="card-mental-health" class="custom-gradient-card rounded-3xl p-5 text-white shadow-lg relative overflow-hidden cursor-pointer transform hover:scale-[1.01] transition-all">
-        <!-- Background subtle decorative shapes -->
+      <!-- HERO BANNER CARD (Mental Health Awareness Month) -->
+      <div id="card-mental-health" class="custom-gradient-card rounded-3xl p-4 text-white shadow-md relative overflow-hidden cursor-pointer transform hover:scale-[1.01] transition-all">
         <div class="absolute -right-8 -bottom-8 w-44 h-44 rounded-full bg-teal-400/10 pointer-events-none"></div>
-        <div class="absolute right-12 top-4 w-28 h-28 rounded-full bg-cyan-300/10 pointer-events-none"></div>
-
         <div class="relative z-10 flex items-start justify-between">
-          <div class="max-w-[70%] space-y-2">
-            <span class="inline-block text-[10px] font-bold tracking-wider uppercase text-teal-200 bg-white/10 px-2 py-0.5 rounded-md">
+          <div class="max-w-[72%] space-y-1.5">
+            <span class="inline-block text-[9px] font-bold tracking-wider uppercase text-teal-200 bg-white/10 px-2 py-0.5 rounded-md">
               MENTAL HEALTH AWARENESS MONTH
             </span>
-            <h3 class="text-xl font-bold leading-tight tracking-tight text-white">
+            <h3 class="text-lg font-bold leading-tight tracking-tight text-white">
               A little room to breathe.
             </h3>
-            <p class="text-xs text-teal-100 font-normal leading-relaxed">
-              Small moments of kindness make a difference.
+            <p class="text-[11px] text-teal-100 font-normal leading-relaxed">
+              Small moments of kindness make a difference across all 3 campuses.
             </p>
           </div>
-
-          <!-- Awareness Ribbon Graphic (SVG representation matching screenshot) -->
-          <div class="w-16 h-20 flex-shrink-0 flex items-center justify-center pt-2">
-            <svg class="w-14 h-16 drop-shadow-md text-[#22d3ee]" viewBox="0 0 64 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div class="w-12 h-16 flex-shrink-0 flex items-center justify-center pt-1">
+            <svg class="w-12 h-14 drop-shadow-md text-[#22d3ee]" viewBox="0 0 64 80" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M32 38C26 27 18 10 32 6C46 10 38 27 32 38Z" fill="#38bdf8" fill-opacity="0.95"/>
-              <path d="M28 34L10 74C13 72 20 68 26 58L34 44" stroke="#22d3ee" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M36 34L54 74C51 72 44 68 38 58L30 44" stroke="#0ea5e9" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="32" cy="18" r="6" fill="#033b43" fill-opacity="0.6"/>
+              <path d="M28 34L10 74C13 72 20 68 26 58L34 44" stroke="#22d3ee" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M36 34L54 74C51 72 44 68 38 58L30 44" stroke="#0ea5e9" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="32" cy="18" r="5" fill="#033b43" fill-opacity="0.6"/>
             </svg>
           </div>
         </div>
-
-        <div class="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs text-teal-100">
-          <span class="flex items-center space-x-1 font-medium">
-            <span>Wellness Protocol Active</span>
-          </span>
-          <span class="text-xs underline font-semibold text-white">View Guidelines &rarr;</span>
-        </div>
       </div>
 
-      <!-- SEARCH BAR (Matches Screenshot) -->
-      <div class="relative">
-        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-          </svg>
-        </div>
-        <input 
-          id="search-input" 
-          type="text" 
-          placeholder="Search tools and features" 
-          class="w-full bg-white text-slate-700 pl-11 pr-4 py-3 rounded-full text-sm font-medium shadow-sm border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-[#004d5a] focus:border-transparent transition-all placeholder-slate-400"
-        />
-        <button id="search-clear-btn" type="button" aria-label="Clear search" class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
+      <!-- PROMINENT ACTIONS BAR: WRITE MESSAGE & UPLOAD ATTACHMENT -->
+      <div id="composer-action-container">
+        <button id="btn-open-composer" type="button" class="w-full bg-gradient-to-r from-[#004d5a] to-[#0a6473] hover:from-[#033b43] hover:to-[#004d5a] text-white p-3.5 rounded-2xl shadow-md flex items-center justify-between font-bold text-sm transition-all active:scale-[0.99] border border-teal-600/30">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-teal-100 shadow-inner">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </div>
+            <div class="text-left">
+              <div class="leading-tight text-white font-bold text-xs">+ Write Support Message / Case</div>
+              <div class="text-[10px] text-teal-200 font-normal mt-0.5">Attach photo evidence & auto-save to DB</div>
+            </div>
+          </div>
+          <span class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-xl text-xs font-bold text-white flex items-center space-x-1 shadow-sm">
+            <span>Compose</span>
+          </span>
         </button>
       </div>
 
-      <!-- QUICK TOOLS GRID -->
+      <!-- ADVANCED SEARCH & LIVE FILTER SUITE -->
       <div class="space-y-2">
-        <div class="flex items-center justify-between px-1">
-          <span class="text-xs font-bold text-slate-600 uppercase tracking-wide">Quick Support Tools</span>
-          <span id="tools-count-badge" class="text-[11px] text-[#004d5a] font-semibold bg-teal-100/60 px-2 py-0.5 rounded-full">4 Tools</span>
+        <!-- Search Input -->
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+          <input 
+            id="search-input" 
+            type="text" 
+            placeholder="Search students, notes, messages, ID..." 
+            class="w-full bg-white text-slate-700 pl-10 pr-9 py-2.5 rounded-2xl text-xs font-medium shadow-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#004d5a] transition-all placeholder-slate-400"
+          />
+          <button id="search-clear-btn" type="button" aria-label="Clear search" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
         </div>
 
-        <div id="tools-grid" class="grid grid-cols-2 gap-2.5">
-          <!-- Tool 1: Intake & Crisis -->
-          <button id="tool-crisis" type="button" class="bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all text-left group">
-            <div class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-              </svg>
-            </div>
-            <div class="text-xs font-bold text-slate-800">Crisis Hotline</div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Immediate student escalation</div>
-          </button>
-
-          <!-- Tool 2: Counseling Scheduler -->
-          <button id="tool-scheduler" type="button" class="bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all text-left group">
-            <div class="w-8 h-8 rounded-xl bg-teal-50 text-[#004d5a] flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-              </svg>
-            </div>
-            <div class="text-xs font-bold text-slate-800">Book Counseling</div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Schedule 1-on-1 session</div>
-          </button>
-
-          <!-- Tool 3: Case Queue -->
-          <button id="tool-tickets" type="button" class="bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all text-left group">
-            <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-            </div>
-            <div class="text-xs font-bold text-slate-800">Support Inquiries</div>
-            <div class="text-[10px] text-slate-500 mt-0.5">8 active, 3 pending review</div>
-          </button>
-
-          <!-- Tool 4: Student Wellness Logs -->
-          <button id="tool-wellness" type="button" class="bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all text-left group">
-            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-              </svg>
-            </div>
-            <div class="text-xs font-bold text-slate-800">Wellness Check</div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Record daily student log</div>
-          </button>
+        <!-- Filter Pills Bar (Campus, Priority, Photo) -->
+        <div class="flex items-center space-x-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-none">
+          <button id="filter-campus-all" type="button" class="px-2.5 py-1 rounded-xl font-bold bg-[#004d5a] text-white shadow-xs whitespace-nowrap transition-colors">All Campuses</button>
+          <button id="filter-campus-central" type="button" class="px-2.5 py-1 rounded-xl font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 whitespace-nowrap transition-colors">Central (9-12)</button>
+          <button id="filter-campus-tk" type="button" class="px-2.5 py-1 rounded-xl font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 whitespace-nowrap transition-colors">Toul Kork (6-8)</button>
+          <button id="filter-campus-sensok" type="button" class="px-2.5 py-1 rounded-xl font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 whitespace-nowrap transition-colors">Sen Sok (K-5)</button>
+          <button id="filter-urgent-only" type="button" class="px-2.5 py-1 rounded-xl font-medium bg-white text-rose-600 border border-rose-200 hover:bg-rose-50 whitespace-nowrap transition-colors">🚨 Urgent Only</button>
+          <button id="filter-images-only" type="button" class="px-2.5 py-1 rounded-xl font-medium bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 whitespace-nowrap transition-colors">📷 Has Photos</button>
         </div>
       </div>
 
-      <!-- ACTIVE STUDENT SUPPORT QUEUE -->
-      <div class="space-y-2.5 pt-1">
+      <!-- ACTIVE STUDENT CASES QUEUE -->
+      <div class="space-y-2 pt-1">
         <div class="flex items-center justify-between px-1">
-          <span class="text-xs font-bold text-slate-600 uppercase tracking-wide">Recent Inquiries</span>
-          <div class="flex items-center space-x-1">
-            <button id="filter-all" type="button" class="text-[11px] font-semibold text-[#004d5a] bg-teal-100/70 px-2.5 py-0.5 rounded-full transition-colors">All</button>
-            <button id="filter-urgent" type="button" class="text-[11px] font-medium text-slate-500 hover:text-slate-800 px-2 py-0.5 rounded-full transition-colors">Urgent</button>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Case Records</span>
+            <span id="search-results-badge" class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.2 rounded-full font-semibold">3 loaded</span>
           </div>
+          <span class="text-[10px] text-slate-400">Click card to view, thread notes & export</span>
         </div>
 
+        <!-- DYNAMIC DATABASE RECORDS CONTAINER -->
         <div id="inquiries-container" class="space-y-2">
-          <!-- Card 1 -->
-          <div data-priority="urgent" class="inquiry-card bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm hover:border-teal-300 transition-all cursor-pointer">
-            <div class="flex items-start justify-between">
-              <div class="flex items-center space-x-2">
-                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                <span class="text-xs font-bold text-slate-800">Sothea Meas</span>
-                <span class="text-[10px] text-slate-400 font-mono">Gr 11 &bull; Sen Sok</span>
-              </div>
-              <span class="text-[10px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">Urgent</span>
-            </div>
-            <p class="text-xs text-slate-600 mt-1.5 font-medium line-clamp-1">Exam anxiety and request for quiet test accommodation</p>
-            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
-              <span>Submitted: 25 mins ago</span>
-              <span class="text-[#004d5a] font-semibold text-[11px] flex items-center space-x-0.5">
-                <span>Respond</span>
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-              </span>
-            </div>
-          </div>
-
-          <!-- Card 2 -->
-          <div data-priority="normal" class="inquiry-card bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm hover:border-teal-300 transition-all cursor-pointer">
-            <div class="flex items-start justify-between">
-              <div class="flex items-center space-x-2">
-                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                <span class="text-xs font-bold text-slate-800">Davy Chea</span>
-                <span class="text-[10px] text-slate-400 font-mono">Gr 9 &bull; Toul Kork</span>
-              </div>
-              <span class="text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">Pending</span>
-            </div>
-            <p class="text-xs text-slate-600 mt-1.5 font-medium line-clamp-1">Peer mediation follow-up and schedule adjustment</p>
-            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
-              <span>Submitted: 2 hrs ago</span>
-              <span class="text-[#004d5a] font-semibold text-[11px] flex items-center space-x-0.5">
-                <span>Respond</span>
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-              </span>
-            </div>
-          </div>
-
-          <!-- Card 3 -->
-          <div data-priority="normal" class="inquiry-card bg-white rounded-2xl p-3.5 border border-slate-200/70 shadow-sm hover:border-teal-300 transition-all cursor-pointer">
-            <div class="flex items-start justify-between">
-              <div class="flex items-center space-x-2">
-                <span class="w-2 h-2 rounded-full bg-teal-500"></span>
-                <span class="text-xs font-bold text-slate-800">Sovan Roth</span>
-                <span class="text-[10px] text-slate-400 font-mono">Gr 12 &bull; Main Campus</span>
-              </div>
-              <span class="text-[10px] font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-100">In Progress</span>
-            </div>
-            <p class="text-xs text-slate-600 mt-1.5 font-medium line-clamp-1">College admission essay guidance and stress management</p>
-            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
-              <span>Submitted: Yesterday</span>
-              <span class="text-[#004d5a] font-semibold text-[11px] flex items-center space-x-0.5">
-                <span>Respond</span>
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-              </span>
-            </div>
-          </div>
+          <!-- Dynamically populated from auto-saved database -->
         </div>
       </div>
 
     </main>
 
-    <!-- TAB 2: HISTORY (Activity Logs) -->
-    <section id="tab-content-history" class="hidden flex-1 px-4 pt-4 space-y-4">
-      <div class="px-1">
-        <p class="text-[11px] font-bold tracking-wider text-teal-800 uppercase">ACTIVITY LOGS</p>
-        <h2 class="text-2xl font-extrabold text-[#033b43] tracking-tight mt-0.5">Counseling History</h2>
+    <!-- ======================================================== -->
+    <!-- TAB 2: DASHBOARD (Operational & Analytics Hub) -->
+    <!-- ======================================================== -->
+    <section id="tab-content-dashboard" class="hidden flex-1 px-4 pt-3 space-y-4">
+      <div class="px-1 flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold tracking-wider text-teal-800 uppercase">REAL-TIME ANALYTICS</p>
+          <h2 class="text-xl font-extrabold text-[#033b43] tracking-tight">Support Dashboard</h2>
+        </div>
+        <button id="btn-refresh-dashboard" type="button" class="text-xs font-semibold text-[#004d5a] bg-teal-100 hover:bg-teal-200 px-2.5 py-1 rounded-xl flex items-center space-x-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          <span>Refresh</span>
+        </button>
       </div>
 
-      <div class="bg-white rounded-2xl p-4 border border-slate-200/70 shadow-sm space-y-3">
-        <div class="flex items-center justify-between text-xs font-bold text-slate-700">
-          <span>Completed Sessions</span>
-          <span class="text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">14 this week</span>
+      <!-- KPI METRIC CARDS GRID -->
+      <div class="grid grid-cols-2 gap-2.5">
+        <!-- Metric 1: Total Cases -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-1">
+          <div class="flex items-center justify-between text-slate-500 text-[11px] font-bold">
+            <span>Total Cases</span>
+            <div class="w-6 h-6 rounded-lg bg-teal-50 text-[#004d5a] flex items-center justify-center font-bold">∑</div>
+          </div>
+          <div id="dash-total-cases" class="text-2xl font-black text-slate-800">0</div>
+          <div class="text-[10px] text-teal-600 font-medium">All GGAS Campuses</div>
         </div>
-        <div class="space-y-3 text-xs divide-y divide-slate-100">
-          <div class="pt-2 flex justify-between items-start">
-            <div>
-              <div class="font-bold text-slate-800">Session with Rithy Panh (Gr 10)</div>
-              <div class="text-slate-500 text-[11px]">Academic stress & time management plan</div>
-            </div>
-            <span class="text-[10px] text-slate-400 font-mono">Yesterday 3:30 PM</span>
+
+        <!-- Metric 2: Urgent Alerts -->
+        <div class="bg-white p-3.5 rounded-2xl border border-rose-200/80 shadow-xs space-y-1">
+          <div class="flex items-center justify-between text-rose-600 text-[11px] font-bold">
+            <span>🚨 Urgent Cases</span>
+            <div class="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">!</div>
           </div>
-          <div class="pt-2 flex justify-between items-start">
-            <div>
-              <div class="font-bold text-slate-800">Campus Wellness Walk - Toul Kork</div>
-              <div class="text-slate-500 text-[11px]">Mental Health Awareness activity with 42 students</div>
-            </div>
-            <span class="text-[10px] text-slate-400 font-mono">Oct 18, 2026</span>
+          <div id="dash-urgent-cases" class="text-2xl font-black text-rose-600">0</div>
+          <div class="text-[10px] text-rose-500 font-medium">Immediate intervention</div>
+        </div>
+
+        <!-- Metric 3: Active / Open -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-1">
+          <div class="flex items-center justify-between text-indigo-600 text-[11px] font-bold">
+            <span>In Progress</span>
+            <div class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">⏳</div>
           </div>
-          <div class="pt-2 flex justify-between items-start">
-            <div>
-              <div class="font-bold text-slate-800">Parent-Counselor Consultation</div>
-              <div class="text-slate-500 text-[11px]">Sen Sok Campus - Grade 8 adjustment review</div>
-            </div>
-            <span class="text-[10px] text-slate-400 font-mono">Oct 16, 2026</span>
+          <div id="dash-active-cases" class="text-2xl font-black text-indigo-700">0</div>
+          <div class="text-[10px] text-indigo-500 font-medium">Ongoing consultations</div>
+        </div>
+
+        <!-- Metric 4: Resolved & Media -->
+        <div class="bg-white p-3.5 rounded-2xl border border-emerald-200/80 shadow-xs space-y-1">
+          <div class="flex items-center justify-between text-emerald-600 text-[11px] font-bold">
+            <span>Resolved Cases</span>
+            <div class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">✓</div>
           </div>
+          <div id="dash-resolved-cases" class="text-2xl font-black text-emerald-600">0</div>
+          <div id="dash-images-count" class="text-[10px] text-slate-500 font-medium">0 photos stored</div>
         </div>
       </div>
 
-      <button id="btn-export-history" type="button" class="w-full bg-white hover:bg-slate-50 text-[#004d5a] font-bold text-xs py-3 rounded-2xl border border-teal-200 shadow-sm transition-colors flex items-center justify-center space-x-2">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-        </svg>
-        <span>Download Monthly Activity Summary</span>
-      </button>
+      <!-- CAMPUS DISTRIBUTION CHART (Visual Progress Bars) -->
+      <div class="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+        <h4 class="text-xs font-extrabold text-[#033b43] uppercase tracking-wide flex items-center justify-between">
+          <span>Campus Distribution</span>
+          <span class="text-[10px] text-slate-400 font-normal">Active vs Closed</span>
+        </h4>
+        <div id="dash-campus-bars" class="space-y-2.5 text-xs">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- CATEGORY BREAKDOWN -->
+      <div class="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+        <h4 class="text-xs font-extrabold text-[#033b43] uppercase tracking-wide">Inquiry Categories</h4>
+        <div id="dash-category-list" class="space-y-2 text-xs">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- COUNSELOR WORKLOAD LEADERBOARD -->
+      <div class="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+        <h4 class="text-xs font-extrabold text-[#033b43] uppercase tracking-wide flex items-center justify-between">
+          <span>Staff Case Assignment</span>
+          <button id="dash-view-users" type="button" class="text-[10px] text-[#004d5a] underline font-bold">View User Rights</button>
+        </h4>
+        <div id="dash-counselor-list" class="space-y-2 text-xs divide-y divide-slate-100">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
     </section>
 
-    <!-- TAB 3: PROFILE (Staff Profile & Bot Integration) -->
-    <section id="tab-content-profile" class="hidden flex-1 px-4 pt-4 space-y-4">
+    <!-- ======================================================== -->
+    <!-- TAB 3: HISTORY (Activity Logs & DB Exports) -->
+    <!-- ======================================================== -->
+    <section id="tab-content-history" class="hidden flex-1 px-4 pt-3 space-y-4">
       <div class="px-1">
-        <p class="text-[11px] font-bold tracking-wider text-teal-800 uppercase">STAFF DETAILS</p>
-        <h2 class="text-2xl font-extrabold text-[#033b43] tracking-tight mt-0.5">Staff Profile</h2>
+        <p class="text-[10px] font-bold tracking-wider text-teal-800 uppercase">ACTIVITY LOGS & BACKUP</p>
+        <h2 class="text-xl font-extrabold text-[#033b43] tracking-tight">Database Records</h2>
       </div>
 
-      <div class="bg-white rounded-3xl p-5 border border-slate-200/70 shadow-sm space-y-4">
-        <div class="flex items-center space-x-4">
-          <div class="w-14 h-14 rounded-2xl bg-[#004d5a] text-white flex items-center justify-center text-xl font-bold shadow-md">
-            CS
-          </div>
-          <div>
-            <h3 id="profile-name" class="text-base font-extrabold text-slate-800">Chanseng Kim</h3>
-            <p class="text-xs text-teal-700 font-semibold">Lead Student Support Counselor</p>
-            <p class="text-[11px] text-slate-400 mt-0.5 font-mono">ID: GGAS-STF-8492 &bull; Active</p>
-          </div>
+      <!-- Database Metrics Box -->
+      <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-xs space-y-3">
+        <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+          <span>Activity Audit Trail</span>
+          <span id="history-total-badge" class="text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full font-mono">0 Logged</span>
         </div>
-
-        <div class="border-t border-slate-100 pt-3 space-y-2 text-xs">
-          <div class="flex justify-between py-1 text-slate-600">
-            <span class="text-slate-400">Assigned Campuses</span>
-            <span class="font-bold text-slate-800">Main, Toul Kork, Sen Sok</span>
-          </div>
-          <div class="flex justify-between py-1 text-slate-600">
-            <span class="text-slate-400">Telegram Bot</span>
-            <span class="font-bold text-[#004d5a]">@ggas_support_bot</span>
-          </div>
-          <div class="flex justify-between py-1 text-slate-600">
-            <span class="text-slate-400">Active Shift</span>
-            <span class="font-bold text-emerald-600">On Duty (7:30 AM - 4:30 PM)</span>
-          </div>
+        <div id="history-records-list" class="space-y-3 text-xs divide-y divide-slate-100 max-h-72 overflow-y-auto pr-1">
+          <!-- Filled dynamically -->
         </div>
       </div>
 
-      <!-- Telegram WebApp Integration Controls -->
-      <div class="bg-teal-50/70 rounded-2xl p-4 border border-teal-200/70 space-y-2.5">
-        <h4 class="text-xs font-bold text-[#004d5a] uppercase tracking-wide">Telegram Bot Integration</h4>
-        <p class="text-xs text-slate-600">Test sending synchronized data back to the Telegram Bot via Telegram WebApp SDK.</p>
-        
-        <button id="btn-telegram-sync" type="button" class="w-full bg-[#004d5a] hover:bg-[#033b43] text-white text-xs font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .39z"/>
-          </svg>
-          <span>Send Status to @ggas_support_bot</span>
+      <!-- Database Exports (PDF, CSV, JSON) -->
+      <div class="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs space-y-2.5">
+        <h4 class="text-xs font-bold text-[#033b43] uppercase tracking-wide">Export & Backup Database</h4>
+        <p class="text-[11px] text-slate-500">Download the complete counseling database with message histories and attachments.</p>
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button id="btn-export-pdf-all" type="button" class="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs py-2.5 rounded-xl border border-rose-200 transition-all flex items-center justify-center space-x-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+            <span>Export PDF Report</span>
+          </button>
+          <button id="btn-export-csv" type="button" class="bg-teal-50 hover:bg-teal-100 text-[#004d5a] font-bold text-xs py-2.5 rounded-xl border border-teal-200 transition-all flex items-center justify-center space-x-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <span>Export CSV</span>
+          </button>
+        </div>
+        <button id="btn-export-json" type="button" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs py-2 rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          <span>Export JSON Full Backup</span>
         </button>
       </div>
     </section>
 
-    <!-- BOTTOM FIXED NAVIGATION (Home, History, Profile - Matches Screenshot) -->
-    <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-slate-200/80 px-6 py-2.5 flex items-center justify-between z-30 shadow-lg">
-      
-      <!-- Home Tab (Active pill style in screenshot: rounded dark teal pill with white icon/text) -->
-      <button id="nav-btn-home" type="button" class="flex items-center space-x-2 bg-[#004d5a] text-white px-5 py-2 rounded-2xl font-bold text-xs shadow-md transition-transform active:scale-95">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+    <!-- ======================================================== -->
+    <!-- TAB 4: PROFILE & USER RIGHTS (Staff & RBAC) -->
+    <!-- ======================================================== -->
+    <section id="tab-content-profile" class="hidden flex-1 px-4 pt-3 space-y-4">
+      <div class="px-1 flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold tracking-wider text-teal-800 uppercase">CREDENTIALS & RBAC</p>
+          <h2 class="text-xl font-extrabold text-[#033b43] tracking-tight">Staff & User Rights</h2>
+        </div>
+        <button id="btn-switch-user-profile" type="button" class="text-xs bg-[#004d5a] text-white font-bold px-3 py-1 rounded-xl shadow-xs">
+          Switch User
+        </button>
+      </div>
+
+      <!-- Current User Card -->
+      <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+        <div class="flex items-center space-x-3.5">
+          <div id="profile-avatar-large" class="w-14 h-14 rounded-2xl bg-[#004d5a] text-white flex items-center justify-center text-xl font-bold shadow-md">
+            CK
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 id="profile-name" class="text-base font-extrabold text-slate-800">Chanseng Kim</h3>
+              <span id="profile-role-tag" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">Admin</span>
+            </div>
+            <p id="profile-title" class="text-xs text-teal-700 font-semibold">Lead Student Support Counselor</p>
+            <p id="profile-email" class="text-[10px] text-slate-400 font-mono mt-0.5">chanseng@ggas.edu.kh</p>
+          </div>
+        </div>
+
+        <!-- Permissions Matrix for Current User -->
+        <div class="border-t border-slate-100 pt-3 space-y-2 text-xs">
+          <div class="font-bold text-slate-700 text-[11px] uppercase tracking-wide">Granted Permissions:</div>
+          <div id="profile-permissions-list" class="grid grid-cols-2 gap-1.5 text-[11px]">
+            <!-- Filled dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Staff Directory & Roles -->
+      <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-xs space-y-3">
+        <h4 class="text-xs font-bold text-[#033b43] uppercase tracking-wide">All Registered Counselors</h4>
+        <div id="all-users-directory" class="space-y-2 text-xs divide-y divide-slate-100">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Bot Integration & Reset Controls -->
+      <div class="bg-teal-50/70 rounded-3xl p-4 border border-teal-200/70 space-y-2.5">
+        <h4 class="text-xs font-bold text-[#004d5a] uppercase tracking-wide">Telegram Bot Integration</h4>
+        <p class="text-xs text-slate-600">Database synchronizes in real time with Telegram bot <b>@chanseng_bot</b>.</p>
+        
+        <button id="btn-telegram-sync" type="button" class="w-full bg-[#004d5a] hover:bg-[#033b43] text-white text-xs font-bold py-2.5 rounded-xl shadow-xs transition-all flex items-center justify-center space-x-2">
+          <span>Send Sync Ping to @chanseng_bot</span>
+        </button>
+
+        <button id="btn-reset-demo" type="button" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold py-2 rounded-xl transition-all">
+          Reset Database to Sample Data
+        </button>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- BOTTOM FIXED 4-TAB NAVIGATION -->
+    <!-- ======================================================== -->
+    <nav class="fixed bottom-0 max-w-md w-full bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between z-30 shadow-lg">
+      <!-- Home Tab -->
+      <button id="nav-btn-home" type="button" class="flex flex-col items-center justify-center text-[#004d5a] font-bold px-2 py-1 text-xs transition-transform active:scale-95">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
         </svg>
-        <span>Home</span>
+        <span class="text-[10px]">Home</span>
+      </button>
+
+      <!-- Dashboard Tab -->
+      <button id="nav-btn-dashboard" type="button" class="flex flex-col items-center justify-center text-slate-400 hover:text-[#004d5a] px-2 py-1 text-xs font-medium transition-colors">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+        <span class="text-[10px]">Dashboard</span>
       </button>
 
       <!-- History Tab -->
-      <button id="nav-btn-history" type="button" class="flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors">
+      <button id="nav-btn-history" type="button" class="flex flex-col items-center justify-center text-slate-400 hover:text-[#004d5a] px-2 py-1 text-xs font-medium transition-colors">
         <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-        <span class="text-[11px]">History</span>
+        <span class="text-[10px]">History</span>
       </button>
 
       <!-- Profile Tab -->
-      <button id="nav-btn-profile" type="button" class="flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors">
+      <button id="nav-btn-profile" type="button" class="flex flex-col items-center justify-center text-slate-400 hover:text-[#004d5a] px-2 py-1 text-xs font-medium transition-colors">
         <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
         </svg>
-        <span class="text-[11px]">Profile</span>
+        <span class="text-[10px]">Staff RBAC</span>
       </button>
-
     </nav>
 
-    <!-- BOT FOOTER CREDIT (Matches screenshot text "@ggas_support_bot") -->
-    <div class="text-center py-3 text-[11px] font-mono text-slate-400">
-      @ggas_support_bot
+    <!-- ======================================================== -->
+    <!-- MODALS CONTAINER -->
+    <!-- ======================================================== -->
+
+    <!-- Modal 1: Write Support Message / New Case (With Image Upload) -->
+    <div id="modal-compose-message" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-3 shadow-2xl max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div>
+            <h3 class="text-base font-extrabold text-[#033b43]">Write Support Case</h3>
+            <p class="text-[10px] text-teal-700 font-medium">Automatic database saving with image upload</p>
+          </div>
+          <button id="close-modal-composer" type="button" class="text-slate-400 hover:text-slate-600 p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        
+        <div class="overflow-y-auto space-y-2.5 text-xs flex-1 pr-1">
+          <!-- Student Name & Student ID -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="comp-student-name" class="font-bold text-slate-700">Student Name:</label>
+              <input id="comp-student-id" type="text" placeholder="ID: GGAS-..." class="text-[10px] px-2 py-0.5 border border-slate-200 rounded-lg w-28 text-right font-mono" />
+            </div>
+            <input id="comp-student-name" type="text" placeholder="e.g. Sothea Meas or Davy Chea" class="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d5a]" />
+            <!-- Quick Chips -->
+            <div class="flex flex-wrap gap-1 mt-1">
+              <button type="button" class="chip-student text-[9px] bg-slate-100 hover:bg-teal-50 text-slate-600 hover:text-[#004d5a] px-2 py-0.5 rounded-full border border-slate-200">Sothea Meas</button>
+              <button type="button" class="chip-student text-[9px] bg-slate-100 hover:bg-teal-50 text-slate-600 hover:text-[#004d5a] px-2 py-0.5 rounded-full border border-slate-200">Davy Chea</button>
+              <button type="button" class="chip-student text-[9px] bg-slate-100 hover:bg-teal-50 text-slate-600 hover:text-[#004d5a] px-2 py-0.5 rounded-full border border-slate-200">Sovan Roth</button>
+              <button type="button" class="chip-student text-[9px] bg-slate-100 hover:bg-teal-50 text-slate-600 hover:text-[#004d5a] px-2 py-0.5 rounded-full border border-slate-200">Rithy Panh</button>
+            </div>
+          </div>
+
+          <!-- Campus & Priority Grid -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label for="comp-campus" class="block font-bold text-slate-700 mb-0.5">Campus:</label>
+              <select id="comp-campus" class="w-full text-xs p-1.5 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d5a]">
+                <option value="Phnom Penh Central">Central (Gr 9-12)</option>
+                <option value="Toul Kork">Toul Kork (Gr 6-8)</option>
+                <option value="Sen Sok">Sen Sok (Gr K-5)</option>
+              </select>
+            </div>
+            <div>
+              <label for="comp-priority" class="block font-bold text-slate-700 mb-0.5">Priority:</label>
+              <select id="comp-priority" class="w-full text-xs p-1.5 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d5a]">
+                <option value="normal">Normal</option>
+                <option value="urgent">🚨 Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Category -->
+          <div>
+            <label for="comp-category" class="block font-bold text-slate-700 mb-0.5">Category:</label>
+            <select id="comp-category" class="w-full text-xs p-1.5 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d5a]">
+              <option value="Academic Anxiety">Academic & Exam Anxiety</option>
+              <option value="Peer Mediation">Peer Mediation & Social</option>
+              <option value="Emotional Wellness">Emotional Wellness & Stress</option>
+              <option value="Attendance / Family">Attendance & Family Guidance</option>
+              <option value="College Guidance">College Guidance</option>
+              <option value="General Consultation">General Consultation</option>
+            </select>
+          </div>
+
+          <!-- Initial Notes / Message -->
+          <div>
+            <label for="comp-notes" class="block font-bold text-slate-700 mb-0.5">Counseling Notes / Message:</label>
+            <textarea id="comp-notes" rows="2.5" placeholder="Write intake details, student concern, consultation summary..." class="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d5a]"></textarea>
+          </div>
+
+          <!-- IMAGE / ATTACHMENT UPLOAD -->
+          <div class="border border-dashed border-teal-300 bg-teal-50/40 p-2.5 rounded-2xl space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-[#004d5a] text-[11px] flex items-center space-x-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <span>Upload Image / Photo Evidence</span>
+              </span>
+              <span class="text-[9px] text-slate-400">PNG or JPEG</span>
+            </div>
+            <input id="comp-image-file" type="file" accept="image/png, image/jpeg, image/jpg" class="text-[10px] w-full file:mr-2 file:py-1 file:px-2.5 file:rounded-xl file:border-0 file:text-[10px] file:font-semibold file:bg-[#004d5a] file:text-white hover:file:bg-[#033b43] cursor-pointer" />
+            
+            <!-- Image Preview Box -->
+            <div id="comp-image-preview-container" class="hidden flex items-center space-x-2 bg-white p-1.5 rounded-xl border border-teal-200">
+              <img id="comp-image-preview" src="" alt="Upload preview" class="w-10 h-10 object-cover rounded-lg border" />
+              <div class="flex-1 min-w-0">
+                <div id="comp-image-name" class="text-[10px] font-bold text-slate-800 truncate">photo.png</div>
+                <div id="comp-image-size" class="text-[9px] text-slate-400">0 KB</div>
+              </div>
+              <button id="comp-image-remove" type="button" class="text-rose-500 hover:text-rose-700 text-xs font-bold p-1">&times;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-2 border-t border-slate-100 flex space-x-2">
+          <button id="btn-save-database" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all shadow-xs flex items-center justify-center space-x-1.5 active:scale-95">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+            <span>Save to Database</span>
+          </button>
+          <button id="btn-save-sync" type="button" class="flex-1 bg-[#004d5a] hover:bg-[#033b43] text-white font-bold text-xs py-2.5 rounded-xl transition-all shadow-xs flex items-center justify-center space-x-1 active:scale-95">
+            <span>Save & Sync Bot</span>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <!-- MODAL / POPUPS CONTAINER -->
+    <!-- Modal 2: Case Detail, Multi-Message Thread & File Downloads (PNG/JPEG/PDF) -->
+    <div id="modal-inquiry" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 backdrop-blur-xs">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-4 space-y-3 shadow-2xl max-h-[94vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <!-- Header -->
+        <div class="flex items-start justify-between border-b border-slate-100 pb-2">
+          <div>
+            <div class="flex items-center space-x-1.5">
+              <h3 id="inquiry-modal-name" class="text-base font-extrabold text-slate-800">Student Case</h3>
+              <span id="inquiry-modal-priority-badge" class="text-[9px] font-bold px-1.5 py-0.2 rounded-full border">Urgent</span>
+            </div>
+            <p id="inquiry-modal-subtitle" class="text-[10px] text-teal-700 font-medium">Campus Information &bull; ID</p>
+          </div>
+          <button id="close-modal-inquiry" type="button" class="text-slate-400 hover:text-slate-600 p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
 
-    <!-- Modal 1: Campus Info -->
+        <!-- Scrollable Case Body -->
+        <div class="overflow-y-auto space-y-3 text-xs flex-1 pr-1" id="case-report-printable-area">
+          <!-- Initial Intake Box -->
+          <div class="bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
+            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Initial Consultation Note:</div>
+            <p id="inquiry-modal-desc" class="text-slate-700 text-xs leading-relaxed">Case description notes.</p>
+          </div>
+
+          <!-- Attached Photo Evidence Box (If any) -->
+          <div id="inquiry-modal-image-box" class="hidden bg-teal-50/50 p-2 rounded-2xl border border-teal-100 space-y-1.5">
+            <div class="flex items-center justify-between text-[10px] font-bold text-[#004d5a]">
+              <span>📷 Attached Photo Evidence</span>
+              <span id="inquiry-image-name" class="font-mono text-slate-400">photo.png</span>
+            </div>
+            <div class="relative group cursor-pointer" id="btn-view-attached-image">
+              <img id="inquiry-modal-image" src="" alt="Attached Evidence" class="w-full h-32 object-cover rounded-xl border border-teal-200" />
+              <div class="absolute inset-0 bg-black/30 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold">
+                Tap to inspect / Download PNG / JPEG
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi-Message Thread (Message History) -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-extrabold text-[#033b43] uppercase tracking-wide">Message History & Notes</span>
+              <span id="case-thread-count" class="text-[9px] bg-teal-100 text-[#004d5a] px-1.5 py-0.2 rounded-full font-bold">0 notes</span>
+            </div>
+            <div id="case-messages-thread" class="space-y-1.5 max-h-44 overflow-y-auto pr-0.5">
+              <!-- Chronological message bubbles dynamically appended -->
+            </div>
+          </div>
+
+          <!-- Form: Write More Message / Follow-up Note -->
+          <div id="case-reply-form" class="bg-slate-50 p-2.5 rounded-2xl border border-slate-200 space-y-1.5">
+            <label for="counselor-notes" class="block font-bold text-slate-700 text-[11px]">✍️ Add Message / Follow-up Note:</label>
+            <textarea id="counselor-notes" rows="2" placeholder="Write follow-up message, consultation notes or outcome..." class="w-full text-xs p-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d5a]"></textarea>
+            
+            <!-- Quick preset action buttons -->
+            <div class="flex flex-wrap gap-1">
+              <button type="button" class="btn-quick-msg text-[9px] bg-white hover:bg-teal-50 text-slate-600 hover:text-[#004d5a] px-1.5 py-0.5 rounded-lg border border-slate-200">Parent Notified</button>
+              <button type="button" class="btn-quick-msg text-[9px] bg-white hover:bg-teal-50 text-slate-600 hover:text-[#004d5a] px-1.5 py-0.5 rounded-lg border border-slate-200">Quiet Room Arranged</button>
+              <button type="button" class="btn-quick-msg text-[9px] bg-white hover:bg-teal-50 text-slate-600 hover:text-[#004d5a] px-1.5 py-0.5 rounded-lg border border-slate-200">1-on-1 Complete</button>
+              <button type="button" class="btn-quick-msg text-[9px] bg-white hover:bg-teal-50 text-slate-600 hover:text-[#004d5a] px-1.5 py-0.5 rounded-lg border border-slate-200">Nurse Referral</button>
+            </div>
+
+            <!-- Optional message image attachment -->
+            <div class="flex items-center justify-between pt-0.5">
+              <input id="reply-image-input" type="file" accept="image/png, image/jpeg" class="text-[9px] file:py-0.5 file:px-2 file:rounded-lg file:border-0 file:bg-slate-200 file:text-slate-700 text-slate-500" />
+              <button id="btn-post-case-message" type="button" class="bg-[#004d5a] hover:bg-[#033b43] text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-transform active:scale-95">
+                Post Note
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- DOWNLOAD & RESOLUTION ACTION BAR (PNG, JPEG, PDF) -->
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <!-- Download Buttons Row (PNG, JPEG, PDF) -->
+          <div class="grid grid-cols-3 gap-1.5">
+            <button id="btn-download-pdf-case" type="button" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[10px] py-1.5 rounded-xl flex items-center justify-center space-x-1 transition-colors">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+              <span>Case PDF</span>
+            </button>
+            <button id="btn-download-png-case" type="button" class="bg-teal-50 hover:bg-teal-100 text-[#004d5a] border border-teal-200 font-bold text-[10px] py-1.5 rounded-xl flex items-center justify-center space-x-1 transition-colors">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <span>Card PNG</span>
+            </button>
+            <button id="btn-download-jpeg-case" type="button" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[10px] py-1.5 rounded-xl flex items-center justify-center space-x-1 transition-colors">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <span>Card JPEG</span>
+            </button>
+          </div>
+
+          <!-- Status Actions: Resolve / Delete (Permission Controlled) -->
+          <div class="flex space-x-2">
+            <button id="btn-resolve-case" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 rounded-xl transition-colors shadow-xs flex items-center justify-center space-x-1">
+              <span>✓ Mark Resolved</span>
+            </button>
+            <button id="btn-send-to-bot" type="button" class="flex-1 bg-[#004d5a] hover:bg-[#033b43] text-white font-bold text-xs py-2 rounded-xl transition-colors shadow-xs flex items-center justify-center space-x-1">
+              <span>Sync to Bot</span>
+            </button>
+          </div>
+          <button id="btn-delete-case" type="button" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] py-1.5 rounded-xl border border-rose-200 transition-colors">
+            🗑️ Delete Case (Admin Right Only)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal 3: Fullscreen Image Viewer with Dedicated PNG & JPEG & PDF Downloads -->
+    <div id="modal-image-viewer" class="hidden fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-3">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-4 space-y-3 shadow-2xl flex flex-col max-h-[90vh]">
+        <div class="flex items-center justify-between border-b pb-2">
+          <div class="truncate pr-2">
+            <div id="viewer-image-title" class="text-xs font-bold text-slate-800 truncate">Photo Attachment</div>
+            <div id="viewer-image-meta" class="text-[10px] text-slate-400">PNG / JPEG Evidence</div>
+          </div>
+          <button id="close-modal-viewer" type="button" class="text-slate-400 hover:text-slate-700 p-1 font-bold text-lg">&times;</button>
+        </div>
+
+        <div class="flex-1 flex items-center justify-center overflow-hidden bg-slate-900 rounded-2xl p-2 min-h-[220px]">
+          <img id="viewer-image-elem" src="" alt="Full view" class="max-w-full max-h-[50vh] object-contain rounded-lg shadow-md" />
+        </div>
+
+        <!-- Download Format Buttons -->
+        <div class="grid grid-cols-3 gap-2 pt-1">
+          <button id="btn-viewer-dl-png" type="button" class="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2 rounded-xl shadow-xs flex items-center justify-center space-x-1">
+            <span>Download PNG</span>
+          </button>
+          <button id="btn-viewer-dl-jpeg" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 rounded-xl shadow-xs flex items-center justify-center space-x-1">
+            <span>Download JPEG</span>
+          </button>
+          <button id="btn-viewer-dl-pdf" type="button" class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2 rounded-xl shadow-xs flex items-center justify-center space-x-1">
+            <span>Download PDF</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal 4: User Switcher & User Rights (RBAC) -->
+    <div id="modal-user-switcher" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div>
+            <h3 class="text-base font-extrabold text-[#033b43]">Staff Switcher & User Rights</h3>
+            <p class="text-[10px] text-teal-700 font-medium">Switch roles to test permissions & access controls</p>
+          </div>
+          <button id="close-modal-users" type="button" class="text-slate-400 hover:text-slate-600 p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        
+        <div class="overflow-y-auto space-y-2 text-xs flex-1 pr-1" id="users-select-container">
+          <!-- Dynamically populated with all staff profiles -->
+        </div>
+
+        <button id="btn-done-users" type="button" class="w-full bg-[#004d5a] text-white text-xs font-bold py-2.5 rounded-xl shadow-xs">
+          Confirm Active User
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal 5: Campuses Information -->
     <div id="modal-campuses" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
           <div class="flex items-center space-x-2">
-            <span class="text-lg font-bold text-[#033b43]">GGAS Campuses</span>
+            <span class="text-base font-bold text-[#033b43]">GGAS Campuses</span>
             <span class="text-xs bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded-full">3 Active</span>
           </div>
           <button id="close-modal-campuses" type="button" class="text-slate-400 hover:text-slate-600 p-1">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
-        <div class="space-y-3 text-xs">
-          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+        <div class="space-y-2 text-xs">
+          <div class="p-2.5 bg-slate-50 rounded-2xl border border-slate-200">
             <div class="font-bold text-slate-800">1. Phnom Penh Central Campus</div>
-            <p class="text-slate-500 text-[11px] mt-0.5">Primary Counseling Office &bull; Grades 9-12</p>
-            <p class="text-[#004d5a] font-mono text-[10px] mt-1">Tel: +855 23 888 101</p>
+            <p class="text-slate-500 text-[10px]">Primary Counseling Wing &bull; Grades 9-12</p>
+            <p class="text-[#004d5a] font-mono text-[10px] mt-0.5">Tel: +855 23 888 101</p>
           </div>
-          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+          <div class="p-2.5 bg-slate-50 rounded-2xl border border-slate-200">
             <div class="font-bold text-slate-800">2. Toul Kork Campus</div>
-            <p class="text-slate-500 text-[11px] mt-0.5">Student Wellness Wing &bull; Grades 6-8</p>
-            <p class="text-[#004d5a] font-mono text-[10px] mt-1">Tel: +855 23 888 102</p>
+            <p class="text-slate-500 text-[10px]">Student Wellness Center &bull; Grades 6-8</p>
+            <p class="text-[#004d5a] font-mono text-[10px] mt-0.5">Tel: +855 23 888 102</p>
           </div>
-          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+          <div class="p-2.5 bg-slate-50 rounded-2xl border border-slate-200">
             <div class="font-bold text-slate-800">3. Sen Sok Campus</div>
-            <p class="text-slate-500 text-[11px] mt-0.5">Early Education & Learning Support &bull; Grades K-5</p>
-            <p class="text-[#004d5a] font-mono text-[10px] mt-1">Tel: +855 23 888 103</p>
+            <p class="text-slate-500 text-[10px]">Early Years & Learning Support &bull; Grades K-5</p>
+            <p class="text-[#004d5a] font-mono text-[10px] mt-0.5">Tel: +855 23 888 103</p>
           </div>
         </div>
-        <button id="btn-done-campuses" type="button" class="w-full bg-[#004d5a] text-white text-xs font-bold py-2.5 rounded-xl shadow-md">
-          Close Window
+        <button id="btn-done-campuses" type="button" class="w-full bg-[#004d5a] text-white text-xs font-bold py-2 rounded-xl shadow-xs">
+          Close
         </button>
       </div>
     </div>
 
-    <!-- Modal 2: Notifications Drawer (19 unread) -->
-    <div id="modal-notifications" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-end justify-center">
-      <div class="bg-white rounded-t-3xl max-w-md w-full p-5 space-y-4 shadow-2xl max-h-[80vh] flex flex-col">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div class="flex items-center space-x-2">
-            <span class="text-base font-bold text-[#033b43]">Notifications</span>
-            <span class="text-xs bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">19 Updates</span>
-          </div>
-          <button id="close-modal-notifs" type="button" class="text-slate-400 hover:text-slate-600 p-1">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-        <div class="overflow-y-auto space-y-2.5 text-xs flex-1 pr-1">
-          <div class="p-3 bg-rose-50/70 border border-rose-100 rounded-2xl">
-            <div class="flex justify-between items-center text-rose-700 font-bold">
-              <span>Urgent Counseling Request</span>
-              <span class="text-[10px] font-normal">10m ago</span>
-            </div>
-            <p class="text-slate-600 mt-1">Grade 11 exam distress referral from Homeroom Teacher.</p>
-          </div>
-          <div class="p-3 bg-teal-50/70 border border-teal-100 rounded-2xl">
-            <div class="flex justify-between items-center text-[#004d5a] font-bold">
-              <span>Mental Health Month Activity</span>
-              <span class="text-[10px] font-normal">1h ago</span>
-            </div>
-            <p class="text-slate-600 mt-1">"Breathe Room" meditation station opened in Toul Kork campus.</p>
-          </div>
-          <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
-            <div class="flex justify-between items-center text-slate-800 font-bold">
-              <span>Peer Mediation Follow-up</span>
-              <span class="text-[10px] font-normal">3h ago</span>
-            </div>
-            <p class="text-slate-600 mt-1">Notes logged for student Davy Chea.</p>
-          </div>
-        </div>
-        <button id="btn-mark-all-read" type="button" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2.5 rounded-xl transition-colors">
-          Mark All As Read
-        </button>
-      </div>
-    </div>
-
-    <!-- Modal 3: Terms / Privacy / Report Generic Dialog -->
+    <!-- Modal 6: Policy / Notice Dialog -->
     <div id="modal-policy" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-3 shadow-2xl">
+        <div class="flex items-center justify-between border-b pb-2">
           <h3 id="policy-modal-title" class="text-base font-bold text-[#033b43]">Document</h3>
-          <button id="close-modal-policy" type="button" class="text-slate-400 hover:text-slate-600 p-1">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
+          <button id="close-modal-policy" type="button" class="text-slate-400 hover:text-slate-600 p-1">&times;</button>
         </div>
-        <div id="policy-modal-body" class="text-xs text-slate-600 leading-relaxed max-h-60 overflow-y-auto space-y-2">
-          <!-- Dynamically filled -->
-        </div>
-        <button id="btn-policy-close" type="button" class="w-full bg-[#004d5a] text-white text-xs font-bold py-2.5 rounded-xl shadow-md">
+        <div id="policy-modal-body" class="text-xs text-slate-600 leading-relaxed max-h-60 overflow-y-auto space-y-2"></div>
+        <button id="btn-policy-close" type="button" class="w-full bg-[#004d5a] text-white text-xs font-bold py-2 rounded-xl shadow-xs">
           Acknowledge & Close
         </button>
       </div>
     </div>
 
-    <!-- Modal 4: Inquiry Response & Detail -->
-    <div id="modal-inquiry" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-          <div>
-            <h3 id="inquiry-modal-name" class="text-base font-bold text-slate-800">Student Case</h3>
-            <p id="inquiry-modal-subtitle" class="text-[11px] text-teal-700 font-medium">Campus Information</p>
-          </div>
-          <button id="close-modal-inquiry" type="button" class="text-slate-400 hover:text-slate-600 p-1">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-        <div class="space-y-2 text-xs">
-          <p id="inquiry-modal-desc" class="text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
-            Case notes description.
-          </p>
-          <label for="counselor-notes" class="block font-bold text-slate-700 pt-1">Counselor Response / Action Taken:</label>
-          <textarea id="counselor-notes" rows="3" placeholder="Type counseling note or scheduled follow-up..." class="w-full text-xs p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d5a]"></textarea>
-        </div>
-        <div class="flex space-x-2 pt-1">
-          <button id="btn-resolve-case" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition-colors shadow-sm">
-            Resolve Case
-          </button>
-          <button id="btn-send-to-bot" type="button" class="flex-1 bg-[#004d5a] hover:bg-[#033b43] text-white font-bold text-xs py-2.5 rounded-xl transition-colors shadow-sm flex items-center justify-center space-x-1">
-            <span>Sync to Bot</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- TOAST NOTIFICATION CONTAINER -->
-    <div id="toast" class="hidden fixed top-16 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white text-xs px-4 py-2.5 rounded-full shadow-2xl z-50 flex items-center space-x-2 backdrop-blur-sm transition-all duration-200">
+    <div id="toast" class="hidden fixed top-14 left-1/2 transform -translate-x-1/2 bg-slate-900/95 text-white text-xs px-4 py-2.5 rounded-full shadow-2xl z-50 flex items-center space-x-2 backdrop-blur-sm transition-all duration-200">
       <span id="toast-icon">✓</span>
       <span id="toast-text">Action completed</span>
     </div>
 
   </div>
 
-  <!-- APPLICATION JAVASCRIPT -->
+  <!-- ======================================================== -->
+  <!-- APPLICATION JAVASCRIPT & DATABASE ENGINE -->
+  <!-- ======================================================== -->
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      // 1. Initialize Telegram WebApp SDK if available
+
+      // ==========================================
+      // 1. DATA MODELS & INITIAL SEEDS
+      // ==========================================
+      var DB_KEY_CASES = 'ggas_support_db_cases_v3';
+      var DB_KEY_USERS = 'ggas_support_db_users_v3';
+      var DB_KEY_ACTIVE_USER = 'ggas_support_active_user_v3';
+
+      // 5 Staff Profiles with RBAC Permissions
+      var defaultUsers = [
+        {
+          id: 1,
+          username: 'chanseng',
+          displayName: 'Chanseng Kim (Chanseng 069)',
+          role: 'Admin',
+          campus: 'All Campuses',
+          email: 'chanseng@ggas.edu.kh',
+          avatar: 'CK',
+          title: 'Lead Student Support Counselor',
+          permissions: ['create_case', 'write_message', 'upload_image', 'resolve_case', 'delete_case', 'export_data', 'manage_users', 'view_dashboard']
+        },
+        {
+          id: 2,
+          username: 'sokha',
+          displayName: 'Sokha Voeun',
+          role: 'Counselor',
+          campus: 'Toul Kork',
+          email: 'sokha.v@ggas.edu.kh',
+          avatar: 'SV',
+          title: 'Campus Counselor (Grades 6-8)',
+          permissions: ['create_case', 'write_message', 'upload_image', 'resolve_case', 'export_data', 'view_dashboard']
+        },
+        {
+          id: 3,
+          username: 'bopha',
+          displayName: 'Bopha Pich',
+          role: 'Counselor',
+          campus: 'Sen Sok',
+          email: 'bopha.p@ggas.edu.kh',
+          avatar: 'BP',
+          title: 'Learning Support Lead (Grades K-5)',
+          permissions: ['create_case', 'write_message', 'upload_image', 'resolve_case', 'export_data', 'view_dashboard']
+        },
+        {
+          id: 4,
+          username: 'dara',
+          displayName: 'Dara Heng',
+          role: 'Staff',
+          campus: 'Phnom Penh Central',
+          email: 'dara.h@ggas.edu.kh',
+          avatar: 'DH',
+          title: 'Student Safeguarding Assistant',
+          permissions: ['create_case', 'write_message', 'upload_image', 'view_dashboard']
+        },
+        {
+          id: 5,
+          username: 'guest',
+          displayName: 'Guest Intern / Observer',
+          role: 'Viewer',
+          campus: 'All Campuses',
+          email: 'intern@ggas.edu.kh',
+          avatar: 'GS',
+          title: 'Counseling Intern (Read-Only)',
+          permissions: ['view_dashboard']
+        }
+      ];
+
+      // Sample Demo SVG Image (Clean 1x1 Vector Badge as Base64 for Offline Preview)
+      var sampleBadgePng = "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="300" height="200" fill="#004d5a"/><circle cx="150" cy="80" r="40" fill="#26a69a"/><text x="150" y="150" font-family="sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold">GGAS EVIDENCE PHOTO</text><text x="150" y="170" font-family="sans-serif" font-size="11" fill="#80cbc4" text-anchor="middle">Exam Accommodation Pass</text></svg>');
+
+      var defaultCases = [
+        {
+          id: 101,
+          student: 'Sothea Meas',
+          studentId: 'GGAS-SS-2024',
+          campus: 'Sen Sok',
+          category: 'Academic Anxiety',
+          priority: 'urgent',
+          status: 'Urgent',
+          counselor: 'Chanseng Kim',
+          counselorRole: 'Admin',
+          notes: 'Exam anxiety distress referral from Homeroom. Student requested quiet testing room with 15 minutes rest break.',
+          timestamp: '25 mins ago',
+          createdAt: new Date(Date.now() - 25 * 60000).toISOString(),
+          image: sampleBadgePng,
+          imageName: 'exam_accommodation_pass.png',
+          messages: [
+            {
+              id: 1,
+              author: 'Chanseng Kim',
+              role: 'Admin',
+              timestamp: '25 mins ago',
+              text: 'Intake initiated. Notified campus nurse and homeroom teacher.'
+            },
+            {
+              id: 2,
+              author: 'Bopha Pich',
+              role: 'Counselor',
+              timestamp: '10 mins ago',
+              text: 'Met student during recess. Confirmed quiet testing space in Room B-12.'
+            }
+          ]
+        },
+        {
+          id: 102,
+          student: 'Davy Chea',
+          studentId: 'GGAS-TK-1892',
+          campus: 'Toul Kork',
+          category: 'Peer Mediation',
+          priority: 'normal',
+          status: 'Pending',
+          counselor: 'Sokha Voeun',
+          counselorRole: 'Counselor',
+          notes: 'Peer mediation follow-up regarding shared group science project communication.',
+          timestamp: '2 hrs ago',
+          createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+          image: null,
+          imageName: null,
+          messages: [
+            {
+              id: 1,
+              author: 'Sokha Voeun',
+              role: 'Counselor',
+              timestamp: '2 hrs ago',
+              text: 'Joint conversation conducted. Students agreed on dividing presentation sections.'
+            }
+          ]
+        },
+        {
+          id: 103,
+          student: 'Sovan Roth',
+          studentId: 'GGAS-PP-1049',
+          campus: 'Phnom Penh Central',
+          category: 'College Guidance',
+          priority: 'normal',
+          status: 'In Progress',
+          counselor: 'Chanseng Kim',
+          counselorRole: 'Admin',
+          notes: 'College admission personal statement brainstorming and stress pacing schedule.',
+          timestamp: 'Yesterday',
+          createdAt: new Date(Date.now() - 24 * 3600000).toISOString(),
+          image: null,
+          imageName: null,
+          messages: [
+            {
+              id: 1,
+              author: 'Chanseng Kim',
+              role: 'Admin',
+              timestamp: 'Yesterday',
+              text: 'Outlined 3 common app essay topics. Target draft review next Tuesday.'
+            }
+          ]
+        }
+      ];
+
+      // ==========================================
+      // 2. AUTOMATIC DATABASE INITIALIZATION
+      // ==========================================
+      function getDatabaseCases() {
+        try {
+          var data = localStorage.getItem(DB_KEY_CASES);
+          if (!data) {
+            localStorage.setItem(DB_KEY_CASES, JSON.stringify(defaultCases));
+            return defaultCases;
+          }
+          return JSON.parse(data) || defaultCases;
+        } catch (e) {
+          return defaultCases;
+        }
+      }
+
+      function saveDatabaseCases(cases) {
+        try {
+          localStorage.setItem(DB_KEY_CASES, JSON.stringify(cases));
+          triggerAutoSaveNotice();
+          updateAllMetrics();
+        } catch (e) {
+          console.error('Storage error', e);
+        }
+      }
+
+      function getDatabaseUsers() {
+        try {
+          var data = localStorage.getItem(DB_KEY_USERS);
+          if (!data) {
+            localStorage.setItem(DB_KEY_USERS, JSON.stringify(defaultUsers));
+            return defaultUsers;
+          }
+          return JSON.parse(data) || defaultUsers;
+        } catch (e) {
+          return defaultUsers;
+        }
+      }
+
+      function getActiveUser() {
+        try {
+          var username = localStorage.getItem(DB_KEY_ACTIVE_USER);
+          var users = getDatabaseUsers();
+          if (username) {
+            for (var i = 0; i < users.length; i++) {
+              if (users[i].username === username) return users[i];
+            }
+          }
+          return users[0];
+        } catch (e) {
+          return defaultUsers[0];
+        }
+      }
+
+      function setActiveUser(username) {
+        localStorage.setItem(DB_KEY_ACTIVE_USER, username);
+        applyUserRightsUI();
+        renderInquiries();
+        showToast('Active staff switched to: ' + getActiveUser().displayName, true);
+      }
+
+      function triggerAutoSaveNotice() {
+        var statusElem = document.getElementById('auto-save-status');
+        if (statusElem) {
+          statusElem.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span><span>Auto-Saved</span>';
+        }
+      }
+
+      // ==========================================
+      // 3. TELEGRAM WEBAPP SDK INTEGRATION
+      // ==========================================
       var tg = window.Telegram ? window.Telegram.WebApp : null;
       if (tg) {
         try {
@@ -612,24 +1070,16 @@
           if (tg.setHeaderColor) tg.setHeaderColor('#033b43');
           if (tg.setBackgroundColor) tg.setBackgroundColor('#e6f4f6');
           
-          // Personalize greeting with real Telegram user if present
           if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            var firstName = tg.initDataUnsafe.user.first_name || 'Chanseng';
-            var greetingElem = document.getElementById('greeting-title');
-            if (greetingElem) {
-              greetingElem.textContent = 'Good morning, ' + firstName;
-            }
-            var profileElem = document.getElementById('profile-name');
-            if (profileElem) {
-              profileElem.textContent = firstName + ' ' + (tg.initDataUnsafe.user.last_name || 'Kim');
-            }
+            var tgFirstName = tg.initDataUnsafe.user.first_name || 'Chanseng 069';
+            var greeting = document.getElementById('greeting-title');
+            if (greeting) greeting.textContent = 'Welcome, ' + tgFirstName;
           }
         } catch (e) {
           console.log('Telegram WebApp init error', e);
         }
       }
 
-      // Helper: Show Toast notification
       function showToast(text, isSuccess) {
         var toast = document.getElementById('toast');
         var toastText = document.getElementById('toast-text');
@@ -643,7 +1093,6 @@
           toast.classList.add('hidden');
         }, 2800);
 
-        // Haptic feedback if in Telegram
         if (tg && tg.HapticFeedback) {
           try {
             tg.HapticFeedback.notificationOccurred(isSuccess ? 'success' : 'warning');
@@ -651,7 +1100,1368 @@
         }
       }
 
-      // 2. Dropdown Menu Toggle (Reload, Terms, Privacy, Report)
+      // ==========================================
+      // 4. USER RIGHTS & RBAC UI CONTROLLER
+      // ==========================================
+      function hasPermission(permission) {
+        var user = getActiveUser();
+        return user.permissions && user.permissions.indexOf(permission) !== -1;
+      }
+
+      function applyUserRightsUI() {
+        var user = getActiveUser();
+
+        // Update header banner
+        var avatarElem = document.getElementById('user-avatar');
+        var nameElem = document.getElementById('user-display-name');
+        var roleElem = document.getElementById('user-role-badge');
+        var campusElem = document.getElementById('user-campus-label');
+
+        if (avatarElem) avatarElem.textContent = user.avatar || 'CS';
+        if (nameElem) nameElem.textContent = user.displayName;
+        if (roleElem) {
+          roleElem.textContent = user.role.toUpperCase();
+          if (user.role === 'Admin') roleElem.className = 'text-[9px] bg-amber-400 text-slate-900 font-extrabold px-1.5 py-0.2 rounded';
+          else if (user.role === 'Counselor') roleElem.className = 'text-[9px] bg-teal-400 text-slate-900 font-extrabold px-1.5 py-0.2 rounded';
+          else if (user.role === 'Staff') roleElem.className = 'text-[9px] bg-indigo-200 text-indigo-900 font-extrabold px-1.5 py-0.2 rounded';
+          else roleElem.className = 'text-[9px] bg-slate-300 text-slate-800 font-extrabold px-1.5 py-0.2 rounded';
+        }
+        if (campusElem) campusElem.textContent = user.campus + ' • Tap to switch';
+
+        // Update Profile tab view
+        var profAvatar = document.getElementById('profile-avatar-large');
+        var profName = document.getElementById('profile-name');
+        var profRole = document.getElementById('profile-role-tag');
+        var profTitle = document.getElementById('profile-title');
+        var profEmail = document.getElementById('profile-email');
+        var permContainer = document.getElementById('profile-permissions-list');
+
+        if (profAvatar) profAvatar.textContent = user.avatar;
+        if (profName) profName.textContent = user.displayName;
+        if (profRole) profRole.textContent = user.role;
+        if (profTitle) profTitle.textContent = user.title;
+        if (profEmail) profEmail.textContent = user.email;
+
+        if (permContainer) {
+          permContainer.innerHTML = '';
+          var allPerms = [
+            { key: 'create_case', label: 'Create Support Cases' },
+            { key: 'write_message', label: 'Write Thread Notes' },
+            { key: 'upload_image', label: 'Upload Evidence' },
+            { key: 'resolve_case', label: 'Resolve Cases' },
+            { key: 'delete_case', label: 'Delete Records' },
+            { key: 'export_data', label: 'Export PDF / CSV' },
+            { key: 'manage_users', label: 'Admin User Rights' },
+            { key: 'view_dashboard', label: 'View Analytics' }
+          ];
+          allPerms.forEach(function (p) {
+            var active = user.permissions.indexOf(p.key) !== -1;
+            var pill = document.createElement('div');
+            pill.className = 'flex items-center space-x-1 ' + (active ? 'text-emerald-700 font-semibold' : 'text-slate-400 line-through');
+            pill.innerHTML = '<span>' + (active ? '✓' : '✗') + '</span><span>' + p.label + '</span>';
+            permContainer.appendChild(pill);
+          });
+        }
+
+        // Adjust Write Button visibility according to permission
+        var composerBtnBox = document.getElementById('composer-action-container');
+        if (composerBtnBox) {
+          if (!hasPermission('create_case')) {
+            composerBtnBox.innerHTML = '<div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-800 text-center font-medium">👁️ You are logged in as <b>' + user.role + '</b> (View-only mode). Case creation is restricted to Counselors & Admin.</div>';
+          } else {
+            composerBtnBox.innerHTML = `
+              <button id="btn-open-composer" type="button" class="w-full bg-gradient-to-r from-[#004d5a] to-[#0a6473] hover:from-[#033b43] hover:to-[#004d5a] text-white p-3.5 rounded-2xl shadow-md flex items-center justify-between font-bold text-sm transition-all active:scale-[0.99] border border-teal-600/30">
+                <div class="flex items-center space-x-3">
+                  <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-teal-100 shadow-inner">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                  </div>
+                  <div class="text-left">
+                    <div class="leading-tight text-white font-bold text-xs">+ Write Support Message / Case</div>
+                    <div class="text-[10px] text-teal-200 font-normal mt-0.5">Attach photo evidence & auto-save to DB</div>
+                  </div>
+                </div>
+                <span class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-xl text-xs font-bold text-white flex items-center space-x-1 shadow-sm">
+                  <span>Compose</span>
+                </span>
+              </button>
+            `;
+            var btn = document.getElementById('btn-open-composer');
+            if (btn) btn.addEventListener('click', openComposerModal);
+          }
+        }
+      }
+
+      // Populate User Switcher Modal List
+      function renderUsersDirectory() {
+        var container = document.getElementById('users-select-container');
+        var profileDir = document.getElementById('all-users-directory');
+        var users = getDatabaseUsers();
+        var active = getActiveUser();
+
+        if (container) {
+          container.innerHTML = '';
+          users.forEach(function (u) {
+            var card = document.createElement('div');
+            var isCur = u.username === active.username;
+            card.className = 'p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ' + (isCur ? 'bg-teal-50/80 border-[#004d5a]' : 'bg-white border-slate-200 hover:border-teal-300');
+            card.innerHTML = `
+              <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-[#004d5a] text-white font-bold text-xs flex items-center justify-center">${u.avatar}</div>
+                <div>
+                  <div class="font-bold text-slate-800 text-xs flex items-center space-x-1.5">
+                    <span>${u.displayName}</span>
+                    <span class="text-[9px] px-1.5 py-0.2 rounded font-bold ${u.role === 'Admin' ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'}">${u.role}</span>
+                  </div>
+                  <div class="text-[10px] text-slate-500">${u.campus} &bull; ${u.title}</div>
+                </div>
+              </div>
+              <input type="radio" name="switch_user_radio" value="${u.username}" ${isCur ? 'checked' : ''} class="w-4 h-4 text-[#004d5a] focus:ring-[#004d5a]" />
+            `;
+            card.addEventListener('click', function () {
+              setActiveUser(u.username);
+              renderUsersDirectory();
+            });
+            container.appendChild(card);
+          });
+        }
+
+        if (profileDir) {
+          profileDir.innerHTML = '';
+          users.forEach(function (u) {
+            var item = document.createElement('div');
+            item.className = 'pt-2 flex justify-between items-start';
+            item.innerHTML = `
+              <div class="flex items-center space-x-2.5">
+                <div class="w-7 h-7 rounded-lg bg-teal-100 text-[#004d5a] font-bold text-[10px] flex items-center justify-center">${u.avatar}</div>
+                <div>
+                  <div class="font-bold text-slate-800 text-xs">${u.displayName}</div>
+                  <div class="text-slate-500 text-[10px]">${u.role} &bull; ${u.campus}</div>
+                </div>
+              </div>
+              <button type="button" class="btn-switch-to-user text-[10px] font-bold text-[#004d5a] underline" data-username="${u.username}">Switch</button>
+            `;
+            profileDir.appendChild(item);
+          });
+          document.querySelectorAll('.btn-switch-to-user').forEach(function (b) {
+            b.addEventListener('click', function () {
+              setActiveUser(this.getAttribute('data-username'));
+              renderUsersDirectory();
+            });
+          });
+        }
+      }
+
+      // ==========================================
+      // 5. LIVE SEARCH & MULTI-FILTER SUITE
+      // ==========================================
+      var searchInput = document.getElementById('search-input');
+      var searchClearBtn = document.getElementById('search-clear-btn');
+      var activeFilterCampus = 'all';
+      var activeFilterUrgentOnly = false;
+      var activeFilterImagesOnly = false;
+
+      function renderInquiries() {
+        var container = document.getElementById('inquiries-container');
+        var historyList = document.getElementById('history-records-list');
+        var resultsBadge = document.getElementById('search-results-badge');
+        if (!container) return;
+
+        var cases = getDatabaseCases();
+        var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+        container.innerHTML = '';
+        if (historyList) historyList.innerHTML = '';
+
+        var matchingCount = 0;
+
+        cases.forEach(function (c) {
+          // 1. Campus filter
+          if (activeFilterCampus !== 'all') {
+            if (c.campus.toLowerCase().indexOf(activeFilterCampus.toLowerCase()) === -1) return;
+          }
+          // 2. Urgent filter
+          if (activeFilterUrgentOnly && c.priority !== 'urgent') return;
+          // 3. Image filter
+          if (activeFilterImagesOnly && !c.image && !c.imageName) return;
+
+          // 4. Query search matching
+          if (query.length > 0) {
+            var messagesText = (c.messages || []).map(function (m) { return m.text + ' ' + m.author; }).join(' ');
+            var haystack = (c.student + ' ' + (c.studentId || '') + ' ' + c.campus + ' ' + c.category + ' ' + c.notes + ' ' + (c.counselor || '') + ' ' + messagesText).toLowerCase();
+            if (haystack.indexOf(query) === -1) return;
+          }
+
+          matchingCount++;
+
+          // Card UI
+          var dotColor = c.priority === 'urgent' ? 'bg-rose-500' : (c.status === 'Resolved' ? 'bg-emerald-500' : 'bg-teal-500');
+          var badgeClass = c.priority === 'urgent'
+            ? 'text-rose-600 bg-rose-50 border-rose-100'
+            : (c.status === 'Resolved'
+                ? 'text-emerald-600 bg-emerald-50 border-emerald-100'
+                : 'text-[#004d5a] bg-teal-50 border-teal-100');
+
+          var msgCount = (c.messages || []).length;
+          var hasPhotoBadge = (c.image || c.imageName)
+            ? '<span class="text-[9px] bg-teal-50 text-[#004d5a] border border-teal-200 px-1.5 py-0.2 rounded-md font-bold flex items-center space-x-0.5"><span>📷 Photo</span></span>'
+            : '';
+
+          var card = document.createElement('div');
+          card.className = 'inquiry-card bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs hover:border-teal-300 transition-all cursor-pointer active:scale-[0.99]';
+          if (c.status === 'Resolved') card.style.opacity = '0.7';
+
+          card.innerHTML = `
+            <div class="flex items-start justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full ${dotColor}"></span>
+                <span class="text-xs font-bold text-slate-800">${c.student}</span>
+                <span class="text-[10px] text-slate-400 font-mono">${c.campus} &bull; #${c.id}</span>
+              </div>
+              <div class="flex items-center space-x-1">
+                ${hasPhotoBadge}
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badgeClass}">
+                  ${c.status || (c.priority === 'urgent' ? 'Urgent' : 'Open')}
+                </span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600 mt-1.5 font-medium line-clamp-2">${c.notes}</p>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400">
+              <span>${c.timestamp || 'Recorded'} &bull; <b class="text-slate-600">${msgCount} note${msgCount === 1 ? '' : 's'}</b></span>
+              <span class="text-[#004d5a] font-semibold text-[11px] flex items-center space-x-0.5">
+                <span>View Case & Thread</span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </span>
+            </div>
+          `;
+
+          card.addEventListener('click', function () {
+            openInquiryDetailModal(c);
+          });
+          container.appendChild(card);
+
+          // Populate History Tab audit list
+          if (historyList) {
+            var histItem = document.createElement('div');
+            histItem.className = 'pt-2 flex justify-between items-start';
+            histItem.innerHTML = `
+              <div>
+                <div class="font-bold text-slate-800 text-xs">${c.student} (${c.campus})</div>
+                <div class="text-slate-500 text-[10px] line-clamp-1">${c.notes}</div>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono">${c.timestamp || 'Saved'}</span>
+            `;
+            historyList.appendChild(histItem);
+          }
+        });
+
+        if (resultsBadge) resultsBadge.textContent = matchingCount + ' of ' + cases.length + ' cases';
+
+        if (matchingCount === 0) {
+          container.innerHTML = `
+            <div class="text-center py-8 px-4 bg-white rounded-2xl border border-dashed border-slate-200">
+              <div class="text-slate-400 text-sm font-medium">No cases found matching criteria</div>
+              <button id="btn-reset-filters" type="button" class="mt-2 text-xs font-bold text-[#004d5a] underline">
+                Clear search & filters
+              </button>
+            </div>
+          `;
+          var resetBtn = document.getElementById('btn-reset-filters');
+          if (resetBtn) {
+            resetBtn.addEventListener('click', function () {
+              if (searchInput) searchInput.value = '';
+              activeFilterCampus = 'all';
+              activeFilterUrgentOnly = false;
+              activeFilterImagesOnly = false;
+              updateFilterButtonsStyle();
+              renderInquiries();
+            });
+          }
+        }
+      }
+
+      // Filter Button Click Listeners
+      var btnCampusAll = document.getElementById('filter-campus-all');
+      var btnCampusCentral = document.getElementById('filter-campus-central');
+      var btnCampusTk = document.getElementById('filter-campus-tk');
+      var btnCampusSenSok = document.getElementById('filter-campus-sensok');
+      var btnFilterUrgent = document.getElementById('filter-urgent-only');
+      var btnFilterImages = document.getElementById('filter-images-only');
+
+      function updateFilterButtonsStyle() {
+        var campusBtns = [
+          { elem: btnCampusAll, key: 'all' },
+          { elem: btnCampusCentral, key: 'Central' },
+          { elem: btnCampusTk, key: 'Toul Kork' },
+          { elem: btnCampusSenSok, key: 'Sen Sok' }
+        ];
+        campusBtns.forEach(function (b) {
+          if (!b.elem) return;
+          if (activeFilterCampus === b.key) {
+            b.elem.className = 'px-2.5 py-1 rounded-xl font-bold bg-[#004d5a] text-white shadow-xs whitespace-nowrap transition-colors';
+          } else {
+            b.elem.className = 'px-2.5 py-1 rounded-xl font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 whitespace-nowrap transition-colors';
+          }
+        });
+
+        if (btnFilterUrgent) {
+          btnFilterUrgent.className = activeFilterUrgentOnly
+            ? 'px-2.5 py-1 rounded-xl font-bold bg-rose-600 text-white shadow-xs whitespace-nowrap transition-colors'
+            : 'px-2.5 py-1 rounded-xl font-medium bg-white text-rose-600 border border-rose-200 hover:bg-rose-50 whitespace-nowrap transition-colors';
+        }
+
+        if (btnFilterImages) {
+          btnFilterImages.className = activeFilterImagesOnly
+            ? 'px-2.5 py-1 rounded-xl font-bold bg-teal-600 text-white shadow-xs whitespace-nowrap transition-colors'
+            : 'px-2.5 py-1 rounded-xl font-medium bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 whitespace-nowrap transition-colors';
+        }
+      }
+
+      if (btnCampusAll) btnCampusAll.addEventListener('click', function () { activeFilterCampus = 'all'; updateFilterButtonsStyle(); renderInquiries(); });
+      if (btnCampusCentral) btnCampusCentral.addEventListener('click', function () { activeFilterCampus = 'Central'; updateFilterButtonsStyle(); renderInquiries(); });
+      if (btnCampusTk) btnCampusTk.addEventListener('click', function () { activeFilterCampus = 'Toul Kork'; updateFilterButtonsStyle(); renderInquiries(); });
+      if (btnCampusSenSok) btnCampusSenSok.addEventListener('click', function () { activeFilterCampus = 'Sen Sok'; updateFilterButtonsStyle(); renderInquiries(); });
+
+      if (btnFilterUrgent) {
+        btnFilterUrgent.addEventListener('click', function () {
+          activeFilterUrgentOnly = !activeFilterUrgentOnly;
+          updateFilterButtonsStyle();
+          renderInquiries();
+        });
+      }
+
+      if (btnFilterImages) {
+        btnFilterImages.addEventListener('click', function () {
+          activeFilterImagesOnly = !activeFilterImagesOnly;
+          updateFilterButtonsStyle();
+          renderInquiries();
+        });
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener('input', function () {
+          if (searchClearBtn) {
+            if (this.value.length > 0) searchClearBtn.classList.remove('hidden');
+            else searchClearBtn.classList.add('hidden');
+          }
+          renderInquiries();
+        });
+      }
+      if (searchClearBtn) {
+        searchClearBtn.addEventListener('click', function () {
+          searchInput.value = '';
+          searchClearBtn.classList.add('hidden');
+          renderInquiries();
+        });
+      }
+
+      // ==========================================
+      // 6. DASHBOARD ANALYTICS CONTROLLER
+      // ==========================================
+      function updateAllMetrics() {
+        var cases = getDatabaseCases();
+        var total = cases.length;
+        var urgent = cases.filter(function (c) { return c.priority === 'urgent'; }).length;
+        var resolved = cases.filter(function (c) { return c.status === 'Resolved'; }).length;
+        var active = total - resolved;
+        var withImages = cases.filter(function (c) { return c.image || c.imageName; }).length;
+
+        // Header and Home badges
+        var countBadge = document.getElementById('db-records-count');
+        if (countBadge) countBadge.textContent = total + ' Cases in DB';
+        var histBadge = document.getElementById('history-total-badge');
+        if (histBadge) histBadge.textContent = total + ' Logged';
+
+        // Dashboard Metric Cards
+        var elTotal = document.getElementById('dash-total-cases');
+        var elUrgent = document.getElementById('dash-urgent-cases');
+        var elActive = document.getElementById('dash-active-cases');
+        var elResolved = document.getElementById('dash-resolved-cases');
+        var elImages = document.getElementById('dash-images-count');
+
+        if (elTotal) elTotal.textContent = total;
+        if (elUrgent) elUrgent.textContent = urgent;
+        if (elActive) elActive.textContent = active;
+        if (elResolved) elResolved.textContent = resolved;
+        if (elImages) elImages.textContent = withImages + ' photo' + (withImages === 1 ? '' : 's') + ' stored';
+
+        // Campus Progress Bars
+        var campusBars = document.getElementById('dash-campus-bars');
+        if (campusBars) {
+          campusBars.innerHTML = '';
+          var campusList = [
+            { name: 'Phnom Penh Central (9-12)', filter: 'Central', color: 'bg-teal-600' },
+            { name: 'Toul Kork Campus (6-8)', filter: 'Toul Kork', color: 'bg-indigo-600' },
+            { name: 'Sen Sok Campus (K-5)', filter: 'Sen Sok', color: 'bg-emerald-600' }
+          ];
+          campusList.forEach(function (cmp) {
+            var cCount = cases.filter(function (c) { return c.campus.indexOf(cmp.filter) !== -1; }).length;
+            var pct = total > 0 ? Math.round((cCount / total) * 100) : 0;
+            var row = document.createElement('div');
+            row.className = 'space-y-1';
+            row.innerHTML = `
+              <div class="flex justify-between text-slate-700 font-bold text-[11px]">
+                <span>${cmp.name}</span>
+                <span class="font-mono">${cCount} cases (${pct}%)</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div class="${cmp.color} h-2 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+              </div>
+            `;
+            campusBars.appendChild(row);
+          });
+        }
+
+        // Category Breakdown
+        var catList = document.getElementById('dash-category-list');
+        if (catList) {
+          catList.innerHTML = '';
+          var categoriesMap = {};
+          cases.forEach(function (c) {
+            var cat = c.category || 'General';
+            categoriesMap[cat] = (categoriesMap[cat] || 0) + 1;
+          });
+          for (var k in categoriesMap) {
+            var item = document.createElement('div');
+            item.className = 'flex items-center justify-between py-1 border-b border-slate-50';
+            item.innerHTML = `
+              <span class="font-medium text-slate-700 text-xs">${k}</span>
+              <span class="font-bold text-[#004d5a] bg-teal-50 px-2 py-0.5 rounded-full text-[10px] font-mono">${categoriesMap[k]} cases</span>
+            `;
+            catList.appendChild(item);
+          }
+        }
+
+        // Counselor Workload Leaderboard
+        var counselorList = document.getElementById('dash-counselor-list');
+        if (counselorList) {
+          counselorList.innerHTML = '';
+          var users = getDatabaseUsers();
+          users.forEach(function (u) {
+            var assignedCount = cases.filter(function (c) {
+              return (c.counselor && c.counselor.indexOf(u.displayName.split(' ')[0]) !== -1) ||
+                     (c.messages || []).some(function (m) { return m.author && m.author.indexOf(u.displayName.split(' ')[0]) !== -1; });
+            }).length;
+
+            var row = document.createElement('div');
+            row.className = 'pt-2 flex items-center justify-between';
+            row.innerHTML = `
+              <div class="flex items-center space-x-2">
+                <span class="w-6 h-6 rounded-md bg-[#004d5a] text-white text-[10px] font-bold flex items-center justify-center">${u.avatar}</span>
+                <div>
+                  <div class="font-bold text-slate-800 text-xs">${u.displayName}</div>
+                  <div class="text-slate-400 text-[10px]">${u.role} &bull; ${u.campus}</div>
+                </div>
+              </div>
+              <span class="font-bold text-xs font-mono text-[#004d5a] bg-slate-100 px-2 py-0.5 rounded-lg">${assignedCount} handled</span>
+            `;
+            counselorList.appendChild(row);
+          });
+        }
+      }
+
+      var btnRefreshDash = document.getElementById('btn-refresh-dashboard');
+      if (btnRefreshDash) {
+        btnRefreshDash.addEventListener('click', function () {
+          updateAllMetrics();
+          showToast('Dashboard metrics refreshed from database', true);
+        });
+      }
+
+      var btnDashUsers = document.getElementById('dash-view-users');
+      if (btnDashUsers) {
+        btnDashUsers.addEventListener('click', function () {
+          switchTab('profile');
+        });
+      }
+
+      // ==========================================
+      // 7. COMPOSER: CREATE CASE & UPLOAD IMAGE
+      // ==========================================
+      var modalComposer = document.getElementById('modal-compose-message');
+      var btnCloseComposer = document.getElementById('close-modal-composer');
+      var btnSaveDatabase = document.getElementById('btn-save-database');
+      var btnSaveSync = document.getElementById('btn-save-sync');
+
+      var compStudentName = document.getElementById('comp-student-name');
+      var compStudentId = document.getElementById('comp-student-id');
+      var compCampus = document.getElementById('comp-campus');
+      var compPriority = document.getElementById('comp-priority');
+      var compCategory = document.getElementById('comp-category');
+      var compNotes = document.getElementById('comp-notes');
+
+      var compImageInput = document.getElementById('comp-image-file');
+      var compImagePreviewBox = document.getElementById('comp-image-preview-container');
+      var compImagePreview = document.getElementById('comp-image-preview');
+      var compImageName = document.getElementById('comp-image-name');
+      var compImageSize = document.getElementById('comp-image-size');
+      var compImageRemove = document.getElementById('comp-image-remove');
+
+      var currentUploadedDataUrl = null;
+      var currentUploadedFileName = null;
+
+      function openComposerModal() {
+        if (!hasPermission('create_case')) {
+          showToast('Permission denied: Viewer cannot create cases', false);
+          return;
+        }
+        if (!modalComposer) return;
+        if (compStudentName) compStudentName.value = '';
+        if (compStudentId) compStudentId.value = 'GGAS-' + Math.floor(1000 + Math.random() * 9000);
+        if (compNotes) compNotes.value = '';
+        currentUploadedDataUrl = null;
+        currentUploadedFileName = null;
+        if (compImageInput) compImageInput.value = '';
+        if (compImagePreviewBox) compImagePreviewBox.classList.add('hidden');
+        modalComposer.classList.remove('hidden');
+      }
+
+      function closeComposerModal() {
+        if (modalComposer) modalComposer.classList.add('hidden');
+      }
+
+      if (btnCloseComposer) btnCloseComposer.addEventListener('click', closeComposerModal);
+
+      // Student quick suggestion chips
+      document.querySelectorAll('.chip-student').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          if (compStudentName) compStudentName.value = this.textContent.trim();
+        });
+      });
+
+      // Handle Image File Upload (PNG or JPEG)
+      if (compImageInput) {
+        compImageInput.addEventListener('change', function () {
+          var file = this.files[0];
+          if (!file) return;
+
+          if (!file.type.match('image.*')) {
+            showToast('Please select a PNG or JPEG image file', false);
+            return;
+          }
+
+          var reader = new FileReader();
+          reader.onload = function (e) {
+            currentUploadedDataUrl = e.target.result;
+            currentUploadedFileName = file.name;
+
+            if (compImagePreview) compImagePreview.src = currentUploadedDataUrl;
+            if (compImageName) compImageName.textContent = file.name;
+            if (compImageSize) compImageSize.textContent = Math.round(file.size / 1024) + ' KB';
+            if (compImagePreviewBox) compImagePreviewBox.classList.remove('hidden');
+
+            showToast('Image attached: ' + file.name, true);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (compImageRemove) {
+        compImageRemove.addEventListener('click', function () {
+          currentUploadedDataUrl = null;
+          currentUploadedFileName = null;
+          if (compImageInput) compImageInput.value = '';
+          if (compImagePreviewBox) compImagePreviewBox.classList.add('hidden');
+        });
+      }
+
+      // Save case function (Automatic DB persistence)
+      function handleSaveNewCase(syncBot) {
+        var student = compStudentName ? compStudentName.value.trim() : '';
+        var notes = compNotes ? compNotes.value.trim() : '';
+        var studentId = compStudentId ? compStudentId.value.trim() : ('GGAS-' + Math.floor(1000 + Math.random() * 9000));
+        var campus = compCampus ? compCampus.value : 'Phnom Penh Central';
+        var priority = compPriority ? compPriority.value : 'normal';
+        var category = compCategory ? compCategory.value : 'General';
+        var user = getActiveUser();
+
+        if (!student) {
+          showToast('Please enter a student name', false);
+          if (compStudentName) compStudentName.focus();
+          return;
+        }
+
+        if (!notes) {
+          showToast('Please enter consultation notes', false);
+          if (compNotes) compNotes.focus();
+          return;
+        }
+
+        var cases = getDatabaseCases();
+        var nextId = cases.length > 0 ? (Math.max.apply(Math, cases.map(function (c) { return c.id || 100; })) + 1) : 101;
+
+        var newCase = {
+          id: nextId,
+          student: student,
+          studentId: studentId,
+          campus: campus,
+          category: category,
+          priority: priority,
+          status: priority === 'urgent' ? 'Urgent' : 'Open',
+          counselor: user.displayName,
+          counselorRole: user.role,
+          notes: notes,
+          timestamp: 'Just now',
+          createdAt: new Date().toISOString(),
+          image: currentUploadedDataUrl || null,
+          imageName: currentUploadedFileName || (currentUploadedDataUrl ? 'evidence_' + nextId + '.png' : null),
+          messages: [
+            {
+              id: 1,
+              author: user.displayName,
+              role: user.role,
+              timestamp: 'Just now',
+              text: notes,
+              image: currentUploadedDataUrl || null
+            }
+          ]
+        };
+
+        cases.unshift(newCase);
+        saveDatabaseCases(cases);
+        renderInquiries();
+        closeComposerModal();
+
+        showToast('✓ Case #' + nextId + ' auto-saved to database!', true);
+
+        if (syncBot) {
+          syncCaseToTelegram(newCase);
+        }
+      }
+
+      if (btnSaveDatabase) {
+        btnSaveDatabase.addEventListener('click', function () {
+          handleSaveNewCase(false);
+        });
+      }
+
+      if (btnSaveSync) {
+        btnSaveSync.addEventListener('click', function () {
+          handleSaveNewCase(true);
+        });
+      }
+
+      // ==========================================
+      // 8. CASE DETAIL, MESSAGE THREAD & EXPORTS
+      // ==========================================
+      var modalInquiry = document.getElementById('modal-inquiry');
+      var closeModalInquiry = document.getElementById('close-modal-inquiry');
+      var inquiryName = document.getElementById('inquiry-modal-name');
+      var inquiryPriorityBadge = document.getElementById('inquiry-modal-priority-badge');
+      var inquirySubtitle = document.getElementById('inquiry-modal-subtitle');
+      var inquiryDesc = document.getElementById('inquiry-modal-desc');
+      var inquiryImageBox = document.getElementById('inquiry-modal-image-box');
+      var inquiryImage = document.getElementById('inquiry-modal-image');
+      var inquiryImageName = document.getElementById('inquiry-image-name');
+      var btnViewAttachedImage = document.getElementById('btn-view-attached-image');
+
+      var caseMessagesThread = document.getElementById('case-messages-thread');
+      var caseThreadCount = document.getElementById('case-thread-count');
+      var counselorNotesInput = document.getElementById('counselor-notes');
+      var btnPostCaseMessage = document.getElementById('btn-post-case-message');
+      var replyImageInput = document.getElementById('reply-image-input');
+
+      var btnResolveCase = document.getElementById('btn-resolve-case');
+      var btnDeleteCase = document.getElementById('btn-delete-case');
+      var btnSendToBot = document.getElementById('btn-send-to-bot');
+
+      var btnDownloadPdfCase = document.getElementById('btn-download-pdf-case');
+      var btnDownloadPngCase = document.getElementById('btn-download-png-case');
+      var btnDownloadJpegCase = document.getElementById('btn-download-jpeg-case');
+
+      var currentSelectedCase = null;
+
+      function openInquiryDetailModal(caseObj) {
+        currentSelectedCase = caseObj;
+        if (!modalInquiry) return;
+
+        var user = getActiveUser();
+
+        if (inquiryName) inquiryName.textContent = caseObj.student;
+        if (inquiryPriorityBadge) {
+          inquiryPriorityBadge.textContent = (caseObj.priority === 'urgent' ? '🚨 URGENT' : 'NORMAL');
+          inquiryPriorityBadge.className = 'text-[9px] font-bold px-1.5 py-0.2 rounded-full border ' +
+            (caseObj.priority === 'urgent' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-teal-100 text-[#004d5a] border-teal-200');
+        }
+        if (inquirySubtitle) {
+          inquirySubtitle.textContent = caseObj.campus + ' • ' + (caseObj.studentId || 'ID: GGAS') + ' • By: ' + (caseObj.counselor || 'Staff');
+        }
+        if (inquiryDesc) inquiryDesc.textContent = caseObj.notes;
+
+        // Image Attachment Display
+        if (caseObj.image) {
+          if (inquiryImage) inquiryImage.src = caseObj.image;
+          if (inquiryImageName) inquiryImageName.textContent = caseObj.imageName || 'evidence.png';
+          if (inquiryImageBox) inquiryImageBox.classList.remove('hidden');
+        } else {
+          if (inquiryImageBox) inquiryImageBox.classList.add('hidden');
+        }
+
+        // Render Message Thread
+        renderCaseMessages(caseObj);
+
+        // RBAC Permissions Enforcement on Modal Buttons
+        if (btnDeleteCase) {
+          if (hasPermission('delete_case')) {
+            btnDeleteCase.classList.remove('hidden');
+          } else {
+            btnDeleteCase.classList.add('hidden');
+          }
+        }
+
+        if (btnResolveCase) {
+          if (hasPermission('resolve_case')) {
+            btnResolveCase.classList.remove('hidden');
+          } else {
+            btnResolveCase.classList.add('hidden');
+          }
+        }
+
+        modalInquiry.classList.remove('hidden');
+      }
+
+      function renderCaseMessages(caseObj) {
+        if (!caseMessagesThread) return;
+        caseMessagesThread.innerHTML = '';
+        var msgs = caseObj.messages || [];
+
+        if (caseThreadCount) caseThreadCount.textContent = msgs.length + ' note' + (msgs.length === 1 ? '' : 's');
+
+        if (msgs.length === 0) {
+          caseMessagesThread.innerHTML = '<div class="text-[10px] text-slate-400 italic py-1">No follow-up messages logged yet.</div>';
+          return;
+        }
+
+        msgs.forEach(function (m) {
+          var bubble = document.createElement('div');
+          bubble.className = 'p-2 bg-slate-100 rounded-xl space-y-0.5 border border-slate-200/70';
+          bubble.innerHTML = `
+            <div class="flex items-center justify-between text-[9px] text-slate-500">
+              <span class="font-bold text-[#004d5a]">${m.author} (${m.role || 'Staff'})</span>
+              <span class="font-mono">${m.timestamp || 'Recorded'}</span>
+            </div>
+            <p class="text-xs text-slate-700">${m.text}</p>
+            ${m.image ? `<div class="pt-1"><img src="${m.image}" class="w-16 h-12 object-cover rounded-md border" /></div>` : ''}
+          `;
+          caseMessagesThread.appendChild(bubble);
+        });
+        caseMessagesThread.scrollTop = caseMessagesThread.scrollHeight;
+      }
+
+      if (closeModalInquiry && modalInquiry) {
+        closeModalInquiry.addEventListener('click', function () {
+          modalInquiry.classList.add('hidden');
+        });
+      }
+
+      // Quick message preset chips
+      document.querySelectorAll('.btn-quick-msg').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (counselorNotesInput) {
+            counselorNotesInput.value = (counselorNotesInput.value ? counselorNotesInput.value + ' | ' : '') + this.textContent.trim();
+          }
+        });
+      });
+
+      // Post follow-up message (Auto-saved to DB immediately)
+      if (btnPostCaseMessage) {
+        btnPostCaseMessage.addEventListener('click', function () {
+          if (!currentSelectedCase) return;
+          if (!hasPermission('write_message')) {
+            showToast('Permission denied: Viewers cannot write messages', false);
+            return;
+          }
+
+          var noteText = counselorNotesInput ? counselorNotesInput.value.trim() : '';
+          if (!noteText) {
+            showToast('Please type a message or choose a quick note', false);
+            return;
+          }
+
+          var user = getActiveUser();
+
+          // Check if attachment provided
+          var file = replyImageInput && replyImageInput.files ? replyImageInput.files[0] : null;
+
+          function commitMessage(replyImageDataUrl) {
+            var cases = getDatabaseCases();
+            for (var i = 0; i < cases.length; i++) {
+              if (cases[i].id === currentSelectedCase.id) {
+                if (!cases[i].messages) cases[i].messages = [];
+                var newMsg = {
+                  id: cases[i].messages.length + 1,
+                  author: user.displayName,
+                  role: user.role,
+                  timestamp: 'Just now',
+                  text: noteText,
+                  image: replyImageDataUrl || null
+                };
+                cases[i].messages.push(newMsg);
+                cases[i].updatedAt = new Date().toISOString();
+                currentSelectedCase = cases[i];
+                break;
+              }
+            }
+            saveDatabaseCases(cases);
+            renderInquiries();
+            renderCaseMessages(currentSelectedCase);
+
+            if (counselorNotesInput) counselorNotesInput.value = '';
+            if (replyImageInput) replyImageInput.value = '';
+
+            showToast('✓ Follow-up message auto-saved to database!', true);
+          }
+
+          if (file) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+              commitMessage(e.target.result);
+            };
+            reader.readAsDataURL(file);
+          } else {
+            commitMessage(null);
+          }
+        });
+      }
+
+      // Resolve Case Action
+      if (btnResolveCase) {
+        btnResolveCase.addEventListener('click', function () {
+          if (!currentSelectedCase) return;
+          if (!hasPermission('resolve_case')) {
+            showToast('Permission denied: Cannot resolve cases', false);
+            return;
+          }
+
+          var user = getActiveUser();
+          var cases = getDatabaseCases();
+          for (var i = 0; i < cases.length; i++) {
+            if (cases[i].id === currentSelectedCase.id) {
+              cases[i].status = 'Resolved';
+              if (!cases[i].messages) cases[i].messages = [];
+              cases[i].messages.push({
+                id: cases[i].messages.length + 1,
+                author: user.displayName,
+                role: user.role,
+                timestamp: 'Just now',
+                text: 'Case formally marked as Resolved by ' + user.displayName + '.'
+              });
+              currentSelectedCase = cases[i];
+              break;
+            }
+          }
+          saveDatabaseCases(cases);
+          renderInquiries();
+          modalInquiry.classList.add('hidden');
+          showToast('Case #' + currentSelectedCase.id + ' marked as Resolved in database', true);
+        });
+      }
+
+      // Delete Case Action (Admin Only)
+      if (btnDeleteCase) {
+        btnDeleteCase.addEventListener('click', function () {
+          if (!currentSelectedCase) return;
+          if (!hasPermission('delete_case')) {
+            showToast('Permission denied: Admin rights required to delete', false);
+            return;
+          }
+
+          if (confirm('Permanently delete Case #' + currentSelectedCase.id + ' for ' + currentSelectedCase.student + '?')) {
+            var cases = getDatabaseCases();
+            cases = cases.filter(function (c) { return c.id !== currentSelectedCase.id; });
+            saveDatabaseCases(cases);
+            renderInquiries();
+            modalInquiry.classList.add('hidden');
+            showToast('Case #' + currentSelectedCase.id + ' deleted from database', true);
+          }
+        });
+      }
+
+      // Click on attached image thumbnail to open Fullscreen Viewer
+      if (btnViewAttachedImage) {
+        btnViewAttachedImage.addEventListener('click', function () {
+          if (currentSelectedCase && currentSelectedCase.image) {
+            openImageViewerModal(currentSelectedCase.image, currentSelectedCase.imageName || (currentSelectedCase.student + '_evidence.png'), currentSelectedCase);
+          }
+        });
+      }
+
+      // ==========================================
+      // 9. IMAGE VIEWER & DOWNLOADS (PNG, JPEG, PDF)
+      // ==========================================
+      var modalImageViewer = document.getElementById('modal-image-viewer');
+      var closeViewerBtn = document.getElementById('close-modal-viewer');
+      var viewerImageElem = document.getElementById('viewer-image-elem');
+      var viewerTitle = document.getElementById('viewer-image-title');
+      var viewerMeta = document.getElementById('viewer-image-meta');
+
+      var btnViewerDlPng = document.getElementById('btn-viewer-dl-png');
+      var btnViewerDlJpeg = document.getElementById('btn-viewer-dl-jpeg');
+      var btnViewerDlPdf = document.getElementById('btn-viewer-dl-pdf');
+
+      var currentViewerDataUrl = null;
+      var currentViewerFilename = 'image';
+      var currentViewerCaseObj = null;
+
+      function openImageViewerModal(dataUrl, filename, caseObj) {
+        currentViewerDataUrl = dataUrl;
+        currentViewerFilename = filename || 'evidence.png';
+        currentViewerCaseObj = caseObj;
+
+        if (viewerImageElem) viewerImageElem.src = dataUrl;
+        if (viewerTitle) viewerTitle.textContent = filename;
+        if (viewerMeta) viewerMeta.textContent = caseObj ? ('Case #' + caseObj.id + ' - ' + caseObj.student) : 'Evidence Photo';
+        if (modalImageViewer) modalImageViewer.classList.remove('hidden');
+      }
+
+      if (closeViewerBtn && modalImageViewer) {
+        closeViewerBtn.addEventListener('click', function () {
+          modalImageViewer.classList.add('hidden');
+        });
+      }
+
+      // DOWNLOAD IMAGE AS PNG FILE
+      function downloadDataUrlAsPNG(dataUrl, baseFilename) {
+        var img = new Image();
+        img.onload = function () {
+          var canvas = document.createElement('canvas');
+          canvas.width = img.width || 800;
+          canvas.height = img.height || 600;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          var pngUrl = canvas.toDataURL('image/png');
+          var a = document.createElement('a');
+          a.href = pngUrl;
+          a.download = (baseFilename.replace(/\.[^/.]+$/, "") || 'evidence') + '.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          showToast('Downloaded image as PNG file', true);
+        };
+        img.src = dataUrl;
+      }
+
+      // DOWNLOAD IMAGE AS JPEG FILE
+      function downloadDataUrlAsJPEG(dataUrl, baseFilename) {
+        var img = new Image();
+        img.onload = function () {
+          var canvas = document.createElement('canvas');
+          canvas.width = img.width || 800;
+          canvas.height = img.height || 600;
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          var jpegUrl = canvas.toDataURL('image/jpeg', 0.95);
+          var a = document.createElement('a');
+          a.href = jpegUrl;
+          a.download = (baseFilename.replace(/\.[^/.]+$/, "") || 'evidence') + '.jpeg';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          showToast('Downloaded image as JPEG file', true);
+        };
+        img.src = dataUrl;
+      }
+
+      // GENERATE AND DOWNLOAD PDF FILE (Case Report with Photo Evidence)
+      function downloadCaseAsPDF(caseObj) {
+        if (!caseObj) return;
+
+        try {
+          var jsPDFClass = window.jspdf ? window.jspdf.jsPDF : null;
+          if (jsPDFClass) {
+            var doc = new jsPDFClass({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            
+            // Header Banner
+            doc.setFillColor(3, 59, 67);
+            doc.rect(0, 0, 210, 28, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.text('GOLDEN GATE AMERICAN SCHOOL', 15, 12);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Student Support & Counseling Case File • Confidential', 15, 20);
+
+            // Case Metadata Box
+            doc.setTextColor(30, 41, 59);
+            doc.setFontSize(13);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Case #' + caseObj.id + ': ' + caseObj.student, 15, 38);
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Campus: ' + caseObj.campus + '   |   Student ID: ' + (caseObj.studentId || 'N/A'), 15, 45);
+            doc.text('Category: ' + caseObj.category + '   |   Priority: ' + (caseObj.priority || 'Normal').toUpperCase(), 15, 51);
+            doc.text('Counselor: ' + (caseObj.counselor || 'Staff') + '   |   Status: ' + (caseObj.status || 'Open'), 15, 57);
+            doc.text('Logged: ' + (caseObj.createdAt ? caseObj.createdAt.split('T')[0] : 'Recent'), 15, 63);
+
+            // Divider
+            doc.setDrawColor(203, 213, 225);
+            doc.line(15, 67, 195, 67);
+
+            // Initial Notes
+            doc.setFont('helvetica', 'bold');
+            doc.text('Initial Intake / Consultation Assessment:', 15, 74);
+            doc.setFont('helvetica', 'normal');
+            var splitNotes = doc.splitTextToSize(caseObj.notes || 'No description', 180);
+            doc.text(splitNotes, 15, 80);
+
+            var currY = 80 + splitNotes.length * 6 + 5;
+
+            // Attached Photo Evidence
+            if (caseObj.image) {
+              doc.setFont('helvetica', 'bold');
+              doc.text('Attached Photo Evidence (' + (caseObj.imageName || 'Document') + '):', 15, currY);
+              currY += 5;
+              try {
+                doc.addImage(caseObj.image, 'JPEG', 15, currY, 110, 60);
+                currY += 68;
+              } catch (imgErr) {
+                doc.setFont('helvetica', 'italic');
+                doc.text('[Photo Evidence Stored in System Database]', 15, currY);
+                currY += 10;
+              }
+            }
+
+            // Message History Thread
+            if (currY > 230) {
+              doc.addPage();
+              currY = 20;
+            }
+
+            doc.setFont('helvetica', 'bold');
+            doc.text('Follow-up Message History & Action Notes:', 15, currY);
+            currY += 6;
+
+            var msgs = caseObj.messages || [];
+            if (msgs.length === 0) {
+              doc.setFont('helvetica', 'italic');
+              doc.text('No follow-up messages recorded.', 15, currY);
+              currY += 8;
+            } else {
+              msgs.forEach(function (m, idx) {
+                if (currY > 260) {
+                  doc.addPage();
+                  currY = 20;
+                }
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.text((idx + 1) + '. ' + m.author + ' (' + (m.role || 'Staff') + ') - ' + (m.timestamp || ''), 15, currY);
+                currY += 4.5;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                var splitM = doc.splitTextToSize(m.text, 175);
+                doc.text(splitM, 18, currY);
+                currY += splitM.length * 4.5 + 4;
+              });
+            }
+
+            // Footer Stamp
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text('Generated from GGAS Student Support Portal • Date: ' + new Date().toLocaleString(), 15, 285);
+
+            doc.save('GGAS_Case_' + caseObj.id + '_' + (caseObj.student.replace(/\s+/g, '_')) + '.pdf');
+            showToast('✓ Case report downloaded as PDF file', true);
+            return;
+          }
+        } catch (e) {
+          console.error('jsPDF generation error', e);
+        }
+
+        // Clean Fallback: Print Dialog / Save as PDF
+        window.print();
+      }
+
+      // Viewer Download Button Handlers
+      if (btnViewerDlPng) {
+        btnViewerDlPng.addEventListener('click', function () {
+          if (currentViewerDataUrl) downloadDataUrlAsPNG(currentViewerDataUrl, currentViewerFilename);
+        });
+      }
+      if (btnViewerDlJpeg) {
+        btnViewerDlJpeg.addEventListener('click', function () {
+          if (currentViewerDataUrl) downloadDataUrlAsJPEG(currentViewerDataUrl, currentViewerFilename);
+        });
+      }
+      if (btnViewerDlPdf) {
+        btnViewerDlPdf.addEventListener('click', function () {
+          if (currentViewerCaseObj) downloadCaseAsPDF(currentViewerCaseObj);
+          else if (currentSelectedCase) downloadCaseAsPDF(currentSelectedCase);
+        });
+      }
+
+      // Modal Inquiry Case Export Buttons
+      if (btnDownloadPdfCase) {
+        btnDownloadPdfCase.addEventListener('click', function () {
+          if (currentSelectedCase) downloadCaseAsPDF(currentSelectedCase);
+        });
+      }
+
+      if (btnDownloadPngCase) {
+        btnDownloadPngCase.addEventListener('click', function () {
+          var printableArea = document.getElementById('case-report-printable-area');
+          if (window.html2canvas && printableArea) {
+            window.html2canvas(printableArea, { scale: 2 }).then(function (canvas) {
+              var a = document.createElement('a');
+              a.href = canvas.toDataURL('image/png');
+              a.download = 'GGAS_Case_' + (currentSelectedCase ? currentSelectedCase.id : 'report') + '.png';
+              a.click();
+              showToast('Downloaded case card as PNG', true);
+            });
+          } else if (currentSelectedCase && currentSelectedCase.image) {
+            downloadDataUrlAsPNG(currentSelectedCase.image, currentSelectedCase.student + '_card.png');
+          } else {
+            showToast('Generating PNG card...', true);
+          }
+        });
+      }
+
+      if (btnDownloadJpegCase) {
+        btnDownloadJpegCase.addEventListener('click', function () {
+          var printableArea = document.getElementById('case-report-printable-area');
+          if (window.html2canvas && printableArea) {
+            window.html2canvas(printableArea, { scale: 2 }).then(function (canvas) {
+              var a = document.createElement('a');
+              a.href = canvas.toDataURL('image/jpeg', 0.95);
+              a.download = 'GGAS_Case_' + (currentSelectedCase ? currentSelectedCase.id : 'report') + '.jpeg';
+              a.click();
+              showToast('Downloaded case card as JPEG', true);
+            });
+          } else if (currentSelectedCase && currentSelectedCase.image) {
+            downloadDataUrlAsJPEG(currentSelectedCase.image, currentSelectedCase.student + '_card.jpeg');
+          } else {
+            showToast('Generating JPEG card...', true);
+          }
+        });
+      }
+
+      // Export all cases as comprehensive PDF
+      var btnExportPdfAll = document.getElementById('btn-export-pdf-all');
+      if (btnExportPdfAll) {
+        btnExportPdfAll.addEventListener('click', function () {
+          var cases = getDatabaseCases();
+          if (cases.length === 0) {
+            showToast('No records to export', false);
+            return;
+          }
+          downloadCaseAsPDF(cases[0]);
+        });
+      }
+
+      // ==========================================
+      // 10. BOT SYNC & FALLBACK COMMAND
+      // ==========================================
+      function syncCaseToTelegram(caseObj) {
+        var payload = {
+          action: 'case_create',
+          id: caseObj.id,
+          student: caseObj.student,
+          campus: caseObj.campus,
+          category: caseObj.category,
+          priority: caseObj.priority,
+          notes: caseObj.notes,
+          image_name: caseObj.imageName,
+          author: caseObj.counselor
+        };
+
+        var sent = false;
+        if (tg && typeof tg.sendData === 'function') {
+          try {
+            tg.sendData(JSON.stringify(payload));
+            sent = true;
+            showToast('✓ Case synced to @chanseng_bot!', true);
+          } catch (e) {
+            console.log('tg.sendData not allowed in Menu Button mode');
+          }
+        }
+
+        if (!sent) {
+          var cmd = '/new ' + caseObj.student + ' - ' + caseObj.notes;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(cmd).then(function () {
+              showToast('Auto-saved to DB! Copied /new command to clipboard', true);
+            }).catch(function () {
+              showToast('Auto-saved to DB! Use /new in chat to log', true);
+            });
+          } else {
+            showToast('Auto-saved to DB! Use /new in chat to log', true);
+          }
+        }
+      }
+
+      if (btnSendToBot) {
+        btnSendToBot.addEventListener('click', function () {
+          if (!currentSelectedCase) return;
+          syncCaseToTelegram(currentSelectedCase);
+          modalInquiry.classList.add('hidden');
+        });
+      }
+
+      var btnTelegramSync = document.getElementById('btn-telegram-sync');
+      if (btnTelegramSync) {
+        btnTelegramSync.addEventListener('click', function () {
+          var user = getActiveUser();
+          syncCaseToTelegram({
+            id: 0,
+            student: 'Staff Status Ping',
+            campus: user.campus,
+            category: 'System Ping',
+            priority: 'Normal',
+            notes: user.displayName + ' (' + user.role + ') online. Database auto-saved across 3 campuses.'
+          });
+        });
+      }
+
+      // ==========================================
+      // 11. EXPORTS & BACKUP (CSV & JSON)
+      // ==========================================
+      var btnExportJson = document.getElementById('btn-export-json');
+      var btnExportCsv = document.getElementById('btn-export-csv');
+
+      if (btnExportJson) {
+        btnExportJson.addEventListener('click', function () {
+          var cases = getDatabaseCases();
+          var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cases, null, 2));
+          var dlAnchor = document.createElement('a');
+          dlAnchor.setAttribute("href", dataStr);
+          dlAnchor.setAttribute("download", "ggas_student_support_db_v3.json");
+          dlAnchor.click();
+          showToast('Exported database as JSON', true);
+        });
+      }
+
+      if (btnExportCsv) {
+        btnExportCsv.addEventListener('click', function () {
+          var cases = getDatabaseCases();
+          var headers = ["ID", "Student", "StudentID", "Campus", "Category", "Priority", "Status", "Counselor", "Notes", "MessagesCount", "HasPhoto", "CreatedAt"];
+          var rows = cases.map(function (c) {
+            return [
+              c.id,
+              '"' + (c.student || '').replace(/"/g, '""') + '"',
+              '"' + (c.studentId || '').replace(/"/g, '""') + '"',
+              '"' + (c.campus || '').replace(/"/g, '""') + '"',
+              '"' + (c.category || '').replace(/"/g, '""') + '"',
+              '"' + (c.priority || '').replace(/"/g, '""') + '"',
+              '"' + (c.status || '').replace(/"/g, '""') + '"',
+              '"' + (c.counselor || '').replace(/"/g, '""') + '"',
+              '"' + (c.notes || '').replace(/"/g, '""') + '"',
+              (c.messages ? c.messages.length : 0),
+              (c.image || c.imageName ? "Yes" : "No"),
+              '"' + (c.createdAt || '') + '"'
+            ].join(",");
+          });
+          var csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent([headers.join(",")].concat(rows).join("\n"));
+          var dlAnchor = document.createElement('a');
+          dlAnchor.setAttribute("href", csvContent);
+          dlAnchor.setAttribute("download", "ggas_student_support_db_v3.csv");
+          dlAnchor.click();
+          showToast('Exported database as CSV', true);
+        });
+      }
+
+      var btnResetDemo = document.getElementById('btn-reset-demo');
+      if (btnResetDemo) {
+        btnResetDemo.addEventListener('click', function () {
+          if (confirm('Reset database to default sample student cases?')) {
+            localStorage.setItem(DB_KEY_CASES, JSON.stringify(defaultCases));
+            renderInquiries();
+            updateAllMetrics();
+            showToast('Database reset to initial sample data', true);
+          }
+        });
+      }
+
+      // ==========================================
+      // 12. TAB SWITCHER CONTROLLER (4 TABS)
+      // ==========================================
+      var navHome = document.getElementById('nav-btn-home');
+      var navDashboard = document.getElementById('nav-btn-dashboard');
+      var navHistory = document.getElementById('nav-btn-history');
+      var navProfile = document.getElementById('nav-btn-profile');
+
+      var contentHome = document.getElementById('tab-content-home');
+      var contentDashboard = document.getElementById('tab-content-dashboard');
+      var contentHistory = document.getElementById('tab-content-history');
+      var contentProfile = document.getElementById('tab-content-profile');
+
+      function switchTab(activeTab) {
+        if (contentHome) contentHome.classList.add('hidden');
+        if (contentDashboard) contentDashboard.classList.add('hidden');
+        if (contentHistory) contentHistory.classList.add('hidden');
+        if (contentProfile) contentProfile.classList.add('hidden');
+
+        var tabs = [
+          { btn: navHome, key: 'home', title: 'Home' },
+          { btn: navDashboard, key: 'dashboard', title: 'Dashboard' },
+          { btn: navHistory, key: 'history', title: 'History' },
+          { btn: navProfile, key: 'profile', title: 'Staff RBAC' }
+        ];
+
+        tabs.forEach(function (t) {
+          if (!t.btn) return;
+          if (t.key === activeTab) {
+            t.btn.className = 'flex flex-col items-center justify-center text-[#004d5a] font-bold px-2 py-1 text-xs transition-transform active:scale-95';
+          } else {
+            t.btn.className = 'flex flex-col items-center justify-center text-slate-400 hover:text-[#004d5a] px-2 py-1 text-xs font-medium transition-colors';
+          }
+        });
+
+        if (activeTab === 'home' && contentHome) contentHome.classList.remove('hidden');
+        else if (activeTab === 'dashboard' && contentDashboard) {
+          contentDashboard.classList.remove('hidden');
+          updateAllMetrics();
+        } else if (activeTab === 'history' && contentHistory) contentHistory.classList.remove('hidden');
+        else if (activeTab === 'profile' && contentProfile) {
+          contentProfile.classList.remove('hidden');
+          renderUsersDirectory();
+        }
+      }
+
+      if (navHome) navHome.addEventListener('click', function () { switchTab('home'); });
+      if (navDashboard) navDashboard.addEventListener('click', function () { switchTab('dashboard'); });
+      if (navHistory) navHistory.addEventListener('click', function () { switchTab('history'); });
+      if (navProfile) navProfile.addEventListener('click', function () { switchTab('profile'); });
+
+      // ==========================================
+      // 13. USER SWITCHER MODAL TRIGGER
+      // ==========================================
+      var modalUserSwitcher = document.getElementById('modal-user-switcher');
+      var closeUsersBtn = document.getElementById('close-modal-users');
+      var btnDoneUsers = document.getElementById('btn-done-users');
+      var btnUserBanner = document.getElementById('btn-user-banner');
+      var menuSwitchUser = document.getElementById('menu-switch-user');
+      var btnSwitchUserProfile = document.getElementById('btn-switch-user-profile');
+
+      function openUserSwitcherModal() {
+        renderUsersDirectory();
+        if (modalUserSwitcher) modalUserSwitcher.classList.remove('hidden');
+      }
+
+      if (btnUserBanner) btnUserBanner.addEventListener('click', openUserSwitcherModal);
+      if (menuSwitchUser) {
+        menuSwitchUser.addEventListener('click', function () {
+          dropdownMenu.classList.add('hidden');
+          openUserSwitcherModal();
+        });
+      }
+      if (btnSwitchUserProfile) btnSwitchUserProfile.addEventListener('click', openUserSwitcherModal);
+
+      if (closeUsersBtn && modalUserSwitcher) {
+        closeUsersBtn.addEventListener('click', function () {
+          modalUserSwitcher.classList.add('hidden');
+        });
+      }
+      if (btnDoneUsers && modalUserSwitcher) {
+        btnDoneUsers.addEventListener('click', function () {
+          modalUserSwitcher.classList.add('hidden');
+        });
+      }
+
+      // Top Menu & Campuses Modals
       var btnTopMenu = document.getElementById('btn-top-menu');
       var dropdownMenu = document.getElementById('dropdown-menu');
 
@@ -660,393 +2470,49 @@
           e.stopPropagation();
           dropdownMenu.classList.toggle('hidden');
         });
-
         document.addEventListener('click', function () {
-          if (!dropdownMenu.classList.contains('hidden')) {
-            dropdownMenu.classList.add('hidden');
-          }
+          if (!dropdownMenu.classList.contains('hidden')) dropdownMenu.classList.add('hidden');
         });
       }
 
-      // Close app button
       var btnCloseApp = document.getElementById('btn-close-app');
       if (btnCloseApp) {
         btnCloseApp.addEventListener('click', function () {
-          if (tg) {
-            try {
-              tg.close();
-            } catch (err) {
-              showToast('Closing GGAS Student Support Portal', true);
-            }
-          } else {
-            showToast('Closing GGAS Student Support Portal', true);
-          }
+          if (tg && typeof tg.close === 'function') tg.close();
+          else showToast('Closing GGAS Student Support Portal', true);
         });
       }
 
-      // Menu Actions
       var menuReload = document.getElementById('menu-reload');
       if (menuReload) {
         menuReload.addEventListener('click', function () {
           dropdownMenu.classList.add('hidden');
-          showToast('Refreshing student support feeds...', true);
-          setTimeout(function () {
-            showToast('Support portal synced with 3 campuses', true);
-          }, 800);
+          renderInquiries();
+          updateAllMetrics();
+          showToast('Database synced and refreshed', true);
         });
       }
 
-      var policyModal = document.getElementById('modal-policy');
-      var policyTitle = document.getElementById('policy-modal-title');
-      var policyBody = document.getElementById('policy-modal-body');
-
-      function openPolicyModal(title, content) {
-        if (!policyModal || !policyTitle || !policyBody) return;
-        policyTitle.textContent = title;
-        policyBody.innerHTML = content;
-        policyModal.classList.remove('hidden');
-      }
-
-      var menuTerms = document.getElementById('menu-terms');
-      if (menuTerms) {
-        menuTerms.addEventListener('click', function () {
-          dropdownMenu.classList.add('hidden');
-          openPolicyModal('GGAS Staff Terms of Use', 
-            '<p><strong>1. Staff Confidentiality:</strong> All student psychological and academic records accessed via the GGAS Student Support Bot are strictly confidential under GGAS Child Safeguarding protocols.</p><p><strong>2. Emergency Protocol:</strong> Imminent risks must be escalated immediately to the designated Campus Safeguarding Lead.</p><p><strong>3. Official Records:</strong> Case notes entered here synchronize directly with the central GGAS Student Support database.</p>'
-          );
-        });
-      }
-
-      var menuPrivacy = document.getElementById('menu-privacy');
-      if (menuPrivacy) {
-        menuPrivacy.addEventListener('click', function () {
-          dropdownMenu.classList.add('hidden');
-          openPolicyModal('Student Data Privacy Policy',
-            '<p><strong>Data Protection Notice:</strong> GGAS Student Support adheres to international student data standards and FERPA-aligned guidelines.</p><p><strong>Encrypted Transmission:</strong> Communications between Telegram Mini App and GGAS backend servers use TLS 1.3 encryption with role-based staff authentication.</p>'
-          );
-        });
-      }
-
-      var menuReport = document.getElementById('menu-report');
-      if (menuReport) {
-        menuReport.addEventListener('click', function () {
-          dropdownMenu.classList.add('hidden');
-          openPolicyModal('Report Incident or System Issue',
-            '<p>Need to report an urgent student concern or technical malfunction?</p><p class="text-slate-700 font-semibold mt-2">Counselor Hotline: +855 23 888 100</p><p class="text-slate-700 font-semibold">IT Support Desk: it-support@ggas.edu.kh</p><p class="mt-2 text-slate-500">Your current workspace session ID has been logged for swift triage.</p>'
-          );
-        });
-      }
-
-      var closePolicyBtn = document.getElementById('close-modal-policy');
-      var btnPolicyClose = document.getElementById('btn-policy-close');
-      if (closePolicyBtn && policyModal) {
-        closePolicyBtn.addEventListener('click', function () {
-          policyModal.classList.add('hidden');
-        });
-      }
-      if (btnPolicyClose && policyModal) {
-        btnPolicyClose.addEventListener('click', function () {
-          policyModal.classList.add('hidden');
-        });
-      }
-
-      // 3. Campuses Modal
       var btnCampuses = document.getElementById('btn-campuses');
       var modalCampuses = document.getElementById('modal-campuses');
       var closeModalCampuses = document.getElementById('close-modal-campuses');
       var btnDoneCampuses = document.getElementById('btn-done-campuses');
 
       if (btnCampuses && modalCampuses) {
-        btnCampuses.addEventListener('click', function () {
-          modalCampuses.classList.remove('hidden');
-        });
+        btnCampuses.addEventListener('click', function () { modalCampuses.classList.remove('hidden'); });
       }
       if (closeModalCampuses && modalCampuses) {
-        closeModalCampuses.addEventListener('click', function () {
-          modalCampuses.classList.add('hidden');
-        });
+        closeModalCampuses.addEventListener('click', function () { modalCampuses.classList.add('hidden'); });
       }
       if (btnDoneCampuses && modalCampuses) {
-        btnDoneCampuses.addEventListener('click', function () {
-          modalCampuses.classList.add('hidden');
-        });
+        btnDoneCampuses.addEventListener('click', function () { modalCampuses.classList.add('hidden'); });
       }
 
-      // 4. Notifications Drawer
-      var btnNotifs = document.getElementById('btn-notifications');
-      var modalNotifs = document.getElementById('modal-notifications');
-      var closeModalNotifs = document.getElementById('close-modal-notifs');
-      var btnMarkAllRead = document.getElementById('btn-mark-all-read');
-      var notifBadge = document.getElementById('notif-badge-count');
-
-      if (btnNotifs && modalNotifs) {
-        btnNotifs.addEventListener('click', function () {
-          modalNotifs.classList.remove('hidden');
-        });
-      }
-      if (closeModalNotifs && modalNotifs) {
-        closeModalNotifs.addEventListener('click', function () {
-          modalNotifs.classList.add('hidden');
-        });
-      }
-      if (btnMarkAllRead && modalNotifs && notifBadge) {
-        btnMarkAllRead.addEventListener('click', function () {
-          notifBadge.textContent = '0';
-          notifBadge.classList.add('hidden');
-          modalNotifs.classList.add('hidden');
-          showToast('All 19 notifications marked as read', true);
-        });
-      }
-
-      // 5. Mental Health Month Banner Card Click
-      var cardMentalHealth = document.getElementById('card-mental-health');
-      if (cardMentalHealth) {
-        cardMentalHealth.addEventListener('click', function () {
-          openPolicyModal('Mental Health Awareness Month - Staff Guidelines',
-            '<p class="font-bold text-teal-800">"A little room to breathe."</p><p class="mt-1">During this awareness month, counselors and staff are encouraging active listening and brief 5-minute mindfulness pauses before class transitions.</p><p class="mt-2"><strong>Counselor Actions:</strong></p><ul class="list-disc pl-4 space-y-1 mt-1 text-slate-600"><li>Distribute Teal Kindness ribbons to campus student ambassadors.</li><li>Facilitate quiet-corner study rooms for test anxiety relief.</li><li>Record student self-referral wellness requests daily.</li></ul>'
-          );
-        });
-      }
-
-      // 6. Navigation Tabs (Home, History, Profile)
-      var navHome = document.getElementById('nav-btn-home');
-      var navHistory = document.getElementById('nav-btn-history');
-      var navProfile = document.getElementById('nav-btn-profile');
-
-      var contentHome = document.getElementById('tab-content-home');
-      var contentHistory = document.getElementById('tab-content-history');
-      var contentProfile = document.getElementById('tab-content-profile');
-
-      function switchTab(activeTab) {
-        // Hide all
-        if (contentHome) contentHome.classList.add('hidden');
-        if (contentHistory) contentHistory.classList.add('hidden');
-        if (contentProfile) contentProfile.classList.add('hidden');
-
-        // Reset nav styles
-        if (navHome) {
-          navHome.className = 'flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors';
-          navHome.innerHTML = '<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg><span class="text-[11px]">Home</span>';
-        }
-        if (navHistory) {
-          navHistory.className = 'flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors';
-          navHistory.innerHTML = '<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span class="text-[11px]">History</span>';
-        }
-        if (navProfile) {
-          navProfile.className = 'flex flex-col items-center justify-center text-slate-500 hover:text-[#004d5a] px-3 py-1 text-xs font-medium transition-colors';
-          navProfile.innerHTML = '<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg><span class="text-[11px]">Profile</span>';
-        }
-
-        if (activeTab === 'home' && contentHome && navHome) {
-          contentHome.classList.remove('hidden');
-          navHome.className = 'flex items-center space-x-2 bg-[#004d5a] text-white px-5 py-2 rounded-2xl font-bold text-xs shadow-md transition-transform active:scale-95';
-          navHome.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg><span>Home</span>';
-        } else if (activeTab === 'history' && contentHistory && navHistory) {
-          contentHistory.classList.remove('hidden');
-          navHistory.className = 'flex items-center space-x-2 bg-[#004d5a] text-white px-5 py-2 rounded-2xl font-bold text-xs shadow-md transition-transform active:scale-95';
-          navHistory.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>History</span>';
-        } else if (activeTab === 'profile' && contentProfile && navProfile) {
-          contentProfile.classList.remove('hidden');
-          navProfile.className = 'flex items-center space-x-2 bg-[#004d5a] text-white px-5 py-2 rounded-2xl font-bold text-xs shadow-md transition-transform active:scale-95';
-          navProfile.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg><span>Profile</span>';
-        }
-      }
-
-      if (navHome) navHome.addEventListener('click', function () { switchTab('home'); });
-      if (navHistory) navHistory.addEventListener('click', function () { switchTab('history'); });
-      if (navProfile) navProfile.addEventListener('click', function () { switchTab('profile'); });
-
-      // 7. Search Filter Functionality
-      var searchInput = document.getElementById('search-input');
-      var searchClearBtn = document.getElementById('search-clear-btn');
-      var inquiryCards = document.querySelectorAll('.inquiry-card');
-
-      if (searchInput) {
-        searchInput.addEventListener('input', function () {
-          var query = this.value.trim().toLowerCase();
-          if (searchClearBtn) {
-            if (query.length > 0) {
-              searchClearBtn.classList.remove('hidden');
-            } else {
-              searchClearBtn.classList.add('hidden');
-            }
-          }
-
-          inquiryCards.forEach(function (card) {
-            var text = card.textContent.toLowerCase();
-            if (text.indexOf(query) !== -1) {
-              card.classList.remove('hidden');
-            } else {
-              card.classList.add('hidden');
-            }
-          });
-        });
-
-        if (searchClearBtn) {
-          searchClearBtn.addEventListener('click', function () {
-            searchInput.value = '';
-            searchClearBtn.classList.add('hidden');
-            inquiryCards.forEach(function (card) {
-              card.classList.remove('hidden');
-            });
-          });
-        }
-      }
-
-      // Filter Buttons (All vs Urgent)
-      var filterAll = document.getElementById('filter-all');
-      var filterUrgent = document.getElementById('filter-urgent');
-
-      if (filterAll && filterUrgent) {
-        filterAll.addEventListener('click', function () {
-          filterAll.className = 'text-[11px] font-semibold text-[#004d5a] bg-teal-100/70 px-2.5 py-0.5 rounded-full transition-colors';
-          filterUrgent.className = 'text-[11px] font-medium text-slate-500 hover:text-slate-800 px-2 py-0.5 rounded-full transition-colors';
-          inquiryCards.forEach(function (card) {
-            card.classList.remove('hidden');
-          });
-        });
-
-        filterUrgent.addEventListener('click', function () {
-          filterUrgent.className = 'text-[11px] font-semibold text-rose-600 bg-rose-100/80 px-2.5 py-0.5 rounded-full transition-colors';
-          filterAll.className = 'text-[11px] font-medium text-slate-500 hover:text-slate-800 px-2 py-0.5 rounded-full transition-colors';
-          inquiryCards.forEach(function (card) {
-            if (card.getAttribute('data-priority') === 'urgent') {
-              card.classList.remove('hidden');
-            } else {
-              card.classList.add('hidden');
-            }
-          });
-        });
-      }
-
-      // 8. Quick Tools Interaction
-      var toolCrisis = document.getElementById('tool-crisis');
-      if (toolCrisis) {
-        toolCrisis.addEventListener('click', function () {
-          openPolicyModal('Campus Crisis Protocol',
-            '<div class="p-3 bg-rose-50 rounded-xl text-rose-800 mb-2 font-bold">EMERGENCY PROTOCOL ACTIVE</div><p>Immediate 24/7 GGAS Crisis Counselor Hotline:</p><p class="text-base font-extrabold text-slate-900 mt-1">+855 23 888 999</p><p class="mt-2 text-slate-500 text-[11px]">Calling or syncing sends an instant dispatch alert to campus nurse & head of school.</p>'
-          );
-        });
-      }
-
-      var toolScheduler = document.getElementById('tool-scheduler');
-      if (toolScheduler) {
-        toolScheduler.addEventListener('click', function () {
-          showToast('Opening Counselor Booking Calendar...', true);
-        });
-      }
-
-      var toolTickets = document.getElementById('tool-tickets');
-      if (toolTickets) {
-        toolTickets.addEventListener('click', function () {
-          showToast('Loaded 8 active inquiries', true);
-        });
-      }
-
-      var toolWellness = document.getElementById('tool-wellness');
-      if (toolWellness) {
-        toolWellness.addEventListener('click', function () {
-          showToast('Wellness check-in sheet ready', true);
-        });
-      }
-
-      // 9. Inquiry Card Click & Response Modal
-      var modalInquiry = document.getElementById('modal-inquiry');
-      var inquiryModalName = document.getElementById('inquiry-modal-name');
-      var inquiryModalSubtitle = document.getElementById('inquiry-modal-subtitle');
-      var inquiryModalDesc = document.getElementById('inquiry-modal-desc');
-      var closeModalInquiry = document.getElementById('close-modal-inquiry');
-      var btnResolveCase = document.getElementById('btn-resolve-case');
-      var btnSendToBot = document.getElementById('btn-send-to-bot');
-      var counselorNotes = document.getElementById('counselor-notes');
-
-      var currentSelectedCard = null;
-
-      inquiryCards.forEach(function (card) {
-        card.addEventListener('click', function () {
-          currentSelectedCard = card;
-          var name = card.querySelector('.text-slate-800') ? card.querySelector('.text-slate-800').textContent : 'Student';
-          var sub = card.querySelector('.font-mono') ? card.querySelector('.font-mono').textContent : '';
-          var desc = card.querySelector('.line-clamp-1') ? card.querySelector('.line-clamp-1').textContent : '';
-
-          if (inquiryModalName) inquiryModalName.textContent = name;
-          if (inquiryModalSubtitle) inquiryModalSubtitle.textContent = sub;
-          if (inquiryModalDesc) inquiryModalDesc.textContent = desc;
-          if (counselorNotes) counselorNotes.value = '';
-
-          if (modalInquiry) modalInquiry.classList.remove('hidden');
-        });
-      });
-
-      if (closeModalInquiry && modalInquiry) {
-        closeModalInquiry.addEventListener('click', function () {
-          modalInquiry.classList.add('hidden');
-        });
-      }
-
-      if (btnResolveCase && modalInquiry) {
-        btnResolveCase.addEventListener('click', function () {
-          modalInquiry.classList.add('hidden');
-          if (currentSelectedCard) {
-            currentSelectedCard.style.opacity = '0.5';
-            var badge = currentSelectedCard.querySelector('span[class*="rounded-full"]');
-            if (badge) {
-              badge.textContent = 'Resolved';
-              badge.className = 'text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100';
-            }
-          }
-          showToast('Case marked as resolved & logged', true);
-        });
-      }
-
-      // Sync data to Telegram Bot via WebApp.sendData()
-      function sendDataToBot(payload) {
-        if (tg && typeof tg.sendData === 'function') {
-          try {
-            tg.sendData(JSON.stringify(payload));
-            showToast('Synced to Telegram Bot @ggas_support_bot', true);
-          } catch (e) {
-            showToast('Data payload prepared: ' + payload.action, true);
-          }
-        } else {
-          showToast('Data payload synchronized: ' + payload.action, true);
-        }
-      }
-
-      if (btnSendToBot && modalInquiry) {
-        btnSendToBot.addEventListener('click', function () {
-          var name = inquiryModalName ? inquiryModalName.textContent : 'Unknown';
-          var note = counselorNotes ? counselorNotes.value : 'Case follow-up complete.';
-          sendDataToBot({
-            action: 'case_update',
-            student: name,
-            notes: note || 'Follow-up consultation conducted.',
-            timestamp: new Date().toISOString()
-          });
-          modalInquiry.classList.add('hidden');
-        });
-      }
-
-      var btnTelegramSync = document.getElementById('btn-telegram-sync');
-      if (btnTelegramSync) {
-        btnTelegramSync.addEventListener('click', function () {
-          sendDataToBot({
-            action: 'staff_sync',
-            staff: 'Chanseng Kim',
-            status: 'On Duty',
-            campuses: ['Main', 'Toul Kork', 'Sen Sok'],
-            timestamp: new Date().toISOString()
-          });
-        });
-      }
-
-      var btnExportHistory = document.getElementById('btn-export-history');
-      if (btnExportHistory) {
-        btnExportHistory.addEventListener('click', function () {
-          showToast('Exporting activity summary PDF...', true);
-        });
-      }
-
+      // Initial Setup
+      applyUserRightsUI();
+      renderInquiries();
+      updateAllMetrics();
+      renderUsersDirectory();
     });
   </script>
 </body>
